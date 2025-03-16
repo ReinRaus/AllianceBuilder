@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +11,7 @@
             --cell-size: 12px;
             --alliance-color: rgba(0, 128, 255, 0.3);
         }
-        
+
         body {
             font-family: Arial, sans-serif;
             margin: 0;
@@ -19,7 +20,7 @@
             flex-direction: column;
             height: 100vh;
         }
-        
+
         header {
             background-color: #333;
             color: white;
@@ -28,12 +29,12 @@
             justify-content: space-between;
             align-items: center;
         }
-        
+
         .language-switcher {
             display: flex;
             gap: 10px;
         }
-        
+
         .language-btn {
             background: none;
             border: 1px solid white;
@@ -42,39 +43,44 @@
             cursor: pointer;
             border-radius: 4px;
         }
-        
+
         .language-btn.active {
             background-color: white;
             color: #333;
         }
-        
+
         .main-container {
             display: flex;
             flex: 1;
             overflow: hidden;
         }
-        
+
         .grid-container {
             flex: 1;
             overflow: auto;
             position: relative;
             background-color: #f0f0f0;
             user-select: none;
+            touch-action: none;
         }
-        
+
+        .building-item.dragging {
+            opacity: 0.5;
+        }
+
         .grid {
             display: grid;
             background-color: white;
             margin: 20px;
             position: relative;
         }
-        
+
         .grid-cell {
             border: 1px solid #ddd;
             box-sizing: border-box;
             position: relative;
         }
-        
+
         .toolbar {
             width: 200px;
             background-color: #f8f8f8;
@@ -82,7 +88,7 @@
             border-left: 1px solid #ddd;
             overflow-y: auto;
         }
-        
+
         .building-item {
             padding: 10px;
             margin-bottom: 10px;
@@ -94,11 +100,11 @@
             align-items: center;
             gap: 10px;
         }
-        
+
         .building-item .icon {
             font-size: 24px;
         }
-        
+
         .building-list {
             background-color: #f8f8f8;
             padding: 10px;
@@ -106,7 +112,18 @@
             height: 150px;
             overflow-y: auto;
         }
-        
+
+        .tooltip {
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            pointer-events: none;
+            z-index: 1000;
+            white-space: nowrap;
+        }
+
         .list-item {
             padding: 8px;
             margin-bottom: 5px;
@@ -117,12 +134,12 @@
             justify-content: space-between;
             align-items: center;
         }
-        
+
         .list-item.selected {
             background-color: #e6f7ff;
             border-color: #91d5ff;
         }
-        
+
         .building {
             position: absolute;
             display: flex;
@@ -137,19 +154,19 @@
             overflow: hidden;
             user-select: none;
         }
-        
+
         .building.selected {
             border-color: #1890ff;
             box-shadow: 0 0 10px rgba(24, 144, 255, 0.5);
         }
-        
+
         .building-area {
             position: absolute;
             background-color: var(--alliance-color);
             z-index: 5;
             pointer-events: none;
         }
-        
+
         .player-castle-name {
             font-size: 10px;
             text-align: center;
@@ -157,7 +174,7 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        
+
         .modal {
             display: none;
             position: fixed;
@@ -168,7 +185,7 @@
             height: 100%;
             background-color: rgba(0, 0, 0, 0.5);
         }
-        
+
         .modal-content {
             background-color: white;
             margin: 15% auto;
@@ -176,18 +193,19 @@
             border-radius: 4px;
             width: 300px;
         }
-        
+
         .close {
             float: right;
             cursor: pointer;
             font-size: 20px;
         }
-        
-        input, button {
+
+        input,
+        button {
             padding: 8px;
             margin: 5px 0;
         }
-        
+
         .config-panel {
             position: fixed;
             right: 20px;
@@ -198,13 +216,17 @@
             border-radius: 4px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
-        
-        .grid-size-input {
-            width: 60px;
+
+        header-buttons {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
-        
-        .header-buttons {
-            margin-right: 20px;
+
+        .grid-size-input {
+            width: 50px;
+            height: 30px;
+            padding: 0 5px;
         }
 
         .header-btn {
@@ -220,25 +242,90 @@
             cursor: pointer;
             border-radius: 4px;
         }
+
+        .resize-handle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #1890ff;
+            bottom: 0;
+            right: 0;
+            cursor: nwse-resize;
+            z-index: 11;
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                flex-direction: column;
+            }
+
+            .toolbar {
+                width: 100%;
+                border-left: none;
+                border-top: 1px solid #ddd;
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: space-around;
+            }
+
+            .building-item {
+                width: 80px;
+                margin: 5px;
+            }
+
+            .grid-container {
+                height: 60vh;
+            }
+
+            .building-item .building-name {
+                display: none;
+            }
+
+            .building-item {
+                width: auto;
+                justify-content: center;
+                padding: 8px;
+            }
+
+            .building-item .icon {
+                font-size: 28px;
+                /* Увеличим размер иконки для лучшей видимости */
+            }
+
+            /* Стиль для отображения надписи при перетаскивании */
+            .building-item.dragging .building-name {
+                display: block;
+                position: absolute;
+                top: 100%;
+                left: 50%;
+                transform: translateX(-50%);
+                background-color: rgba(255, 255, 255, 0.9);
+                padding: 4px 8px;
+                border-radius: 4px;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                white-space: nowrap;
+                z-index: 100;
+            }
+        }
     </style>
 </head>
+
 <body>
     <header>
         <h1 id="title">Планировщик зданий альянса</h1>
-            <div class="header-buttons">
-                <button id="saveButton" class="header-btn">Сохранить</button>
-            </div>
+        <div class="header-buttons">
+            <button id="saveButton" class="header-btn">Сохранить</button>
+            <label id="grid-size-label" for="gridSizeInput">Размер сетки:</label>
+            <input type="number" id="gridSizeInput" class="grid-size-input" min="10" max="100" value="50">
+            <button id="applyGridSize" data-key="apply">Применить</button>
+        </div>
         <div class="language-switcher">
             <button class="language-btn active" data-lang="ru">RU</button>
             <button class="language-btn" data-lang="en">EN</button>
         </div>
     </header>
-    
+
     <div class="main-container">
-        <div class="grid-container">
-            <div class="grid" id="grid"></div>
-        </div>
-        
         <div class="toolbar" id="toolbar">
             <h2 id="buildings-header">Здания</h2>
             <div class="building-item" draggable="true" data-type="fortress">
@@ -248,6 +335,10 @@
             <div class="building-item" draggable="true" data-type="outpost">
                 <div class="icon">🚩</div>
                 <div class="building-name" data-key="outpost">Форпост альянса</div>
+            </div>
+            <div class="building-item" draggable="true" data-type="hellgates">
+                <div class="icon">👹</div>
+                <div class="building-name" data-key="hellgates">Адские врата</div>
             </div>
             <div class="building-item" draggable="true" data-type="hospital">
                 <div class="icon">🏥</div>
@@ -270,13 +361,17 @@
                 <div class="building-name" data-key="deadzone">Мертвая зона</div>
             </div>
         </div>
+
+        <div class="grid-container">
+            <div class="grid" id="grid"></div>
+        </div>
     </div>
-    
+
     <div class="building-list">
         <h3 id="buildings-list-header">Список зданий</h3>
         <div id="buildings-list"></div>
     </div>
-    
+
     <div id="playerNameModal" class="modal">
         <div class="modal-content">
             <span class="close">&times;</span>
@@ -285,7 +380,7 @@
             <button id="savePlayerName" data-key="save">Сохранить</button>
         </div>
     </div>
-    
+
     <div id="renameModal" class="modal">
         <div class="modal-content">
             <span class="close">&times;</span>
@@ -294,13 +389,7 @@
             <button id="saveRename" data-key="save">Сохранить</button>
         </div>
     </div>
-    
-    <div class="config-panel">
-        <label id="grid-size-label" for="gridSizeInput">Размер сетки:</label>
-        <input type="number" id="gridSizeInput" class="grid-size-input" min="10" max="100" value="50">
-        <button id="applyGridSize" data-key="apply">Применить</button>
-    </div>
-    
+
     <script>
         // Локализация
         const translations = {
@@ -315,6 +404,7 @@
                 save: "Сохранить",
                 fortress: "Крепость альянса",
                 outpost: "Форпост альянса",
+                hellgates: "Адские врата",
                 hospital: "Госпиталь",
                 farm: "Ферма",
                 warehouse: "Склад",
@@ -337,6 +427,7 @@
                 save: "Save",
                 fortress: "Alliance Fortress",
                 outpost: "Alliance Outpost",
+                hellgates: "Hell Gates",
                 hospital: "Hospital",
                 farm: "Farm",
                 warehouse: "Warehouse",
@@ -349,26 +440,27 @@
                 saveButton: "Save",
             }
         };
-        
+
         let currentLang = 'ru';
-        
+
         // Конфигурация зданий
         const buildingConfig = {
             fortress: { icon: '🏰', size: 2, areaSize: 12, limit: 1, type: 'alliance' },
             outpost: { icon: '🚩', size: 1, areaSize: 9, limit: 5, type: 'alliance' },
+            hellgates: { icon: '👹', size: 2, areaSize: 0, limit: 1, type: 'alliance' },
             hospital: { icon: '🏥', size: 2, areaSize: 0, limit: 1, type: 'alliance' },
             farm: { icon: '🌾', size: 2, areaSize: 0, limit: 1, type: 'alliance' },
             warehouse: { icon: '🏭', size: 2, areaSize: 0, limit: 1, type: 'alliance' },
             castle: { icon: '🏯', size: 2, areaSize: 0, limit: -1, type: 'player' },
             deadzone: { icon: '⚠️', size: 1, areaSize: 0, limit: -1, type: 'special' }
         };
-        
+
         // Состояние приложения
         let buildings = [];
         let selectedBuilding = null;
         let gridSize = 50;
         let cellSize = 24; // px
-        
+
         // Инициализация приложения
         document.addEventListener('DOMContentLoaded', () => {
             setupGrid();
@@ -378,13 +470,13 @@
             updateLanguage();
             checkLocationHash();
         });
-        
+
         // Настройка сетки
         function setupGrid() {
             const grid = document.getElementById('grid');
             grid.style.gridTemplateColumns = `repeat(${gridSize}, ${cellSize}px)`;
             grid.style.gridTemplateRows = `repeat(${gridSize}, ${cellSize}px)`;
-            
+
             grid.innerHTML = '';
             for (let i = 0; i < gridSize * gridSize; i++) {
                 const cell = document.createElement('div');
@@ -394,29 +486,34 @@
                 grid.appendChild(cell);
             }
         }
-        
+
         // Настройка перетаскивания
         function setupDragAndDrop() {
             const buildingItems = document.querySelectorAll('.building-item');
             const grid = document.getElementById('grid');
-            
+
             buildingItems.forEach(item => {
                 item.addEventListener('dragstart', (e) => {
                     e.dataTransfer.setData('text/plain', item.dataset.type);
+                    item.classList.add('dragging');
+                });
+
+                item.addEventListener('dragend', () => {
+                    item.classList.remove('dragging');
                 });
             });
-            
+
             grid.addEventListener('dragover', (e) => {
                 e.preventDefault();
             });
-            
+
             grid.addEventListener('drop', (e) => {
                 e.preventDefault();
                 const type = e.dataTransfer.getData('text/plain');
                 const rect = grid.getBoundingClientRect();
                 const x = Math.floor((e.clientX - rect.left) / cellSize);
                 const y = Math.floor((e.clientY - rect.top) / cellSize);
-                
+
                 if (type === 'castle') {
                     showPlayerNameModal(x, y);
                 } else {
@@ -424,47 +521,50 @@
                 }
             });
         }
-        
+
         // Настройка обработчиков событий
         function setupEventListeners() {
             // Обработчики для модального окна имени игрока
             const playerNameModal = document.getElementById('playerNameModal');
             const closeButtons = document.querySelectorAll('.close');
             const savePlayerNameButton = document.getElementById('savePlayerName');
-            
+
+            setupTouchEvents();
+            setupTouchDragAndDrop();
+
             closeButtons.forEach(btn => {
                 btn.addEventListener('click', () => {
                     playerNameModal.style.display = 'none';
                     document.getElementById('renameModal').style.display = 'none';
                 });
             });
-            
+
             savePlayerNameButton.addEventListener('click', () => {
                 const x = parseInt(playerNameModal.dataset.x);
                 const y = parseInt(playerNameModal.dataset.y);
                 const playerName = document.getElementById('playerNameInput').value;
-                
+
                 createBuilding('castle', x, y, playerName);
                 playerNameModal.style.display = 'none';
                 document.getElementById('playerNameInput').value = '';
-                });
-            
+            });
+
             // Обработчик для кнопки сохранения при переименовании
             const saveRenameButton = document.getElementById('saveRename');
             saveRenameButton.addEventListener('click', () => {
                 const buildingId = document.getElementById('renameModal').dataset.buildingId;
                 const newName = document.getElementById('renameInput').value;
-                
+
                 const building = buildings.find(b => b.id === buildingId);
                 if (building) {
                     building.playerName = newName;
                     updateBuilding(building);
                     updateBuildingsList();
                 }
-                
+
                 document.getElementById('renameModal').style.display = 'none';
             });
-            
+
             // Переключение языка
             const langButtons = document.querySelectorAll('.language-btn');
             langButtons.forEach(btn => {
@@ -475,7 +575,7 @@
                     updateLanguage();
                 });
             });
-            
+
             // Изменение размера сетки
             const applyGridSizeButton = document.getElementById('applyGridSize');
             applyGridSizeButton.addEventListener('click', () => {
@@ -486,12 +586,14 @@
                     redrawAllBuildings();
                 }
             });
-            
+
             const saveButton = document.getElementById('saveButton');
             saveButton.addEventListener('click', saveStateToBase64);
-            
+
+            window.addEventListener('resize', checkScreenSize);
+            checkScreenSize(); // Вызвать сразу при загрузке
         }
-        
+
         // Показ модального окна для ввода имени игрока
         function showPlayerNameModal(x, y) {
             const modal = document.getElementById('playerNameModal');
@@ -500,35 +602,35 @@
             modal.style.display = 'block';
             document.getElementById('playerNameInput').focus();
         }
-        
+
         // Показ модального окна для переименования замка
         function showRenameModal(buildingId) {
             const building = buildings.find(b => b.id === buildingId);
             if (!building) return;
-            
+
             const modal = document.getElementById('renameModal');
             modal.dataset.buildingId = buildingId;
             document.getElementById('renameInput').value = building.playerName || '';
             modal.style.display = 'block';
             document.getElementById('renameInput').focus();
         }
-        
+
         // Создание здания
         function createBuilding(type, x, y, playerName = '') {
             const config = buildingConfig[type];
             if (!config) return;
-            
+
             // Проверка лимита зданий
             if (config.limit > 0) {
                 const count = buildings.filter(b => b.type === type).length;
                 if (count >= config.limit) {
-                    alert(currentLang === 'ru' ? 
-                        `Достигнут лимит зданий типа ${translations[currentLang][type]}` : 
+                    alert(currentLang === 'ru' ?
+                        `Достигнут лимит зданий типа ${translations[currentLang][type]}` :
                         `Building limit reached for ${translations[currentLang][type]}`);
                     return;
                 }
             }
-            
+
             // Корректировка позиции для зданий размером больше 1x1
             if (config.size > 1) {
                 x = Math.max(0, Math.min(gridSize - config.size, x));
@@ -537,15 +639,15 @@
                 x = Math.max(0, Math.min(gridSize - 1, x));
                 y = Math.max(0, Math.min(gridSize - 1, y));
             }
-            
+
             // Проверка перекрытия с другими зданиями
-            if (checkOverlap(x, y, config.size)) {
-                alert(currentLang === 'ru' ? 
-                    'Здания не могут перекрываться!' : 
+            if (checkOverlap(x, y, config.size, config.size)) {
+                alert(currentLang === 'ru' ?
+                    'Здания не могут перекрываться!' :
                     'Buildings cannot overlap!');
                 return;
             }
-            
+
             // Создание нового объекта здания
             const newBuilding = {
                 id: Date.now().toString(),
@@ -557,66 +659,75 @@
                 areaSize: config.areaSize,
                 icon: config.icon
             };
-            
+
             buildings.push(newBuilding);
             addBuildingToGrid(newBuilding);
             updateBuildingsList();
         }
-        
+
         // Проверка перекрытия с другими зданиями
-        function checkOverlap(x, y, size) {
+        function checkOverlap(x, y, width, height) {
+            // Если передан один размер, используем его для обоих измерений (обратная совместимость)
+            if (height === undefined) {
+                height = width;
+            }
+
             for (const building of buildings) {
+                // Получаем размеры текущего здания
+                const buildingWidth = building.width || building.size;
+                const buildingHeight = building.height || building.size;
+
                 // Проверка перекрытия между зданиями
-                if (x < building.x + building.size && 
-                    x + size > building.x && 
-                    y < building.y + building.size && 
-                    y + size > building.y) {
+                if (x < building.x + buildingWidth &&
+                    x + width > building.x &&
+                    y < building.y + buildingHeight &&
+                    y + height > building.y) {
                     return true;
                 }
             }
             return false;
         }
-        
+
         // Добавление здания на сетку
         function addBuildingToGrid(building) {
             const grid = document.getElementById('grid');
-            
+
             // Создание области влияния для зданий с areaSize > 0
             if (building.areaSize > 0) {
                 const area = document.createElement('div');
                 area.className = 'building-area';
                 area.id = `area-${building.id}`;
-                
+
                 const offset = Math.floor((building.areaSize - building.size) / 2);
                 const areaX = building.x - offset;
                 const areaY = building.y - offset;
-                
+
                 area.style.left = `${areaX * cellSize}px`;
                 area.style.top = `${areaY * cellSize}px`;
                 area.style.width = `${building.areaSize * cellSize}px`;
                 area.style.height = `${building.areaSize * cellSize}px`;
-                
+
                 grid.appendChild(area);
             }
-            
+
             // Создание самого здания
             const buildingEl = document.createElement('div');
             buildingEl.className = 'building';
             buildingEl.id = `building-${building.id}`;
             buildingEl.dataset.id = building.id;
-            
+
             buildingEl.style.left = `${building.x * cellSize}px`;
             buildingEl.style.top = `${building.y * cellSize}px`;
             buildingEl.style.width = `${building.size * cellSize}px`;
             buildingEl.style.height = `${building.size * cellSize}px`;
-            
+
             // Содержимое здания
             if (building.type !== 'castle') {
                 const icon = document.createElement('div');
                 icon.textContent = building.icon;
                 buildingEl.appendChild(icon);
             }
-            
+
             // Если это замок игрока, добавить имя
             if (building.type === 'castle' && building.playerName) {
                 const nameEl = document.createElement('div');
@@ -627,60 +738,77 @@
             if (building.type === 'castle') {
                 buildingEl.style.backgroundColor = 'rgba(255, 255, 255, 0.7)'; // Полупрозрачный белый
             }
-            
+
+            // Add this line at the end of the addBuildingToGrid function
+            if (building.type === 'deadzone') {
+                // Если это первое создание, установим width и height равными size
+                if (!building.width) building.width = building.size;
+                if (!building.height) building.height = building.size;
+
+                buildingEl.style.width = `${building.width * cellSize}px`;
+                buildingEl.style.height = `${building.height * cellSize}px`;
+
+                makeDeadZoneResizable(buildingEl, building);
+            } else {
+                buildingEl.style.width = `${building.size * cellSize}px`;
+                buildingEl.style.height = `${building.size * cellSize}px`;
+            }
+
+            addTouchHandlersToBuilding(buildingEl, building);
+
             // Добавление обработчиков для выбора и перетаскивания
             buildingEl.addEventListener('mousedown', (e) => {
                 if (e.button === 0) { // Левая кнопка мыши
                     selectBuilding(building.id);
-                    
+
                     // Начало перетаскивания
                     const startX = e.clientX;
                     const startY = e.clientY;
                     const startBuildingX = building.x;
                     const startBuildingY = building.y;
-                    
+
                     const handleMouseMove = (moveEvent) => {
                         const deltaX = Math.floor((moveEvent.clientX - startX) / cellSize);
                         const deltaY = Math.floor((moveEvent.clientY - startY) / cellSize);
-                        
+
                         const newX = Math.max(0, Math.min(gridSize - building.size, startBuildingX + deltaX));
                         const newY = Math.max(0, Math.min(gridSize - building.size, startBuildingY + deltaY));
-                        
+
                         // Временно скрыть здание для проверки перекрытия
                         const index = buildings.findIndex(b => b.id === building.id);
                         const tempBuilding = buildings.splice(index, 1)[0];
-                        
+
                         if (!checkOverlap(newX, newY, building.size)) {
                             building.x = newX;
                             building.y = newY;
                             updateBuilding(building);
                         }
-                        
+
                         // Вернуть здание в массив
                         buildings.splice(index, 0, tempBuilding);
                     };
-                    
+
                     const handleMouseUp = () => {
                         document.removeEventListener('mousemove', handleMouseMove);
                         document.removeEventListener('mouseup', handleMouseUp);
                     };
-                    
+
                     document.addEventListener('mousemove', handleMouseMove);
                     document.addEventListener('mouseup', handleMouseUp);
                 }
             });
-            
+
             grid.appendChild(buildingEl);
         }
-        
+
         // Обновление положения и внешнего вида здания
         function updateBuilding(building) {
             const buildingEl = document.getElementById(`building-${building.id}`);
             if (!buildingEl) return;
-            
+
             buildingEl.style.left = `${building.x * cellSize}px`;
             buildingEl.style.top = `${building.y * cellSize}px`;
-            
+
             // Обновление области влияния, если есть
             if (building.areaSize > 0) {
                 const areaEl = document.getElementById(`area-${building.id}`);
@@ -688,12 +816,12 @@
                     const offset = Math.floor((building.areaSize - building.size) / 2);
                     const areaX = building.x - offset;
                     const areaY = building.y - offset;
-                    
+
                     areaEl.style.left = `${areaX * cellSize}px`;
                     areaEl.style.top = `${areaY * cellSize}px`;
                 }
             }
-            
+
             // Обновление имени для замка игрока
             if (building.type === 'castle') {
                 let nameEl = buildingEl.querySelector('.player-castle-name');
@@ -702,31 +830,39 @@
                     nameEl.className = 'player-castle-name';
                     buildingEl.appendChild(nameEl);
                 }
-                
+
                 if (nameEl) {
                     nameEl.textContent = building.playerName || '';
                 }
             }
+
+            if (building.type === 'deadzone') {
+                buildingEl.style.width = `${building.width * cellSize}px`;
+                buildingEl.style.height = `${building.height * cellSize}px`;
+            } else {
+                buildingEl.style.width = `${building.size * cellSize}px`;
+                buildingEl.style.height = `${building.size * cellSize}px`;
+            }
         }
-        
+
         // Выбор здания
         function selectBuilding(id) {
             // Снять выделение с предыдущего здания
             if (selectedBuilding) {
                 const prevEl = document.getElementById(`building-${selectedBuilding}`);
                 if (prevEl) prevEl.classList.remove('selected');
-                
+
                 const prevListItem = document.getElementById(`list-item-${selectedBuilding}`);
                 if (prevListItem) prevListItem.classList.remove('selected');
             }
-            
+
             selectedBuilding = id;
-            
+
             // Выделить новое здание
             if (selectedBuilding) {
                 const buildingEl = document.getElementById(`building-${selectedBuilding}`);
                 if (buildingEl) buildingEl.classList.add('selected');
-                
+
                 const listItem = document.getElementById(`list-item-${selectedBuilding}`);
                 if (listItem) {
                     listItem.classList.add('selected');
@@ -734,51 +870,51 @@
                 }
             }
         }
-        
+
         // Удаление здания
         function deleteBuilding(id) {
             const index = buildings.findIndex(b => b.id === id);
             if (index === -1) return;
-            
+
             const building = buildings[index];
             buildings.splice(index, 1);
-            
+
             // Удаление элементов с DOM
             const buildingEl = document.getElementById(`building-${id}`);
             if (buildingEl) buildingEl.remove();
-            
+
             if (building.areaSize > 0) {
                 const areaEl = document.getElementById(`area-${id}`);
                 if (areaEl) areaEl.remove();
             }
-            
+
             if (selectedBuilding === id) {
                 selectedBuilding = null;
             }
-            
+
             updateBuildingsList();
         }
-        
+
         // Обновление списка зданий
         function updateBuildingsList() {
             const listContainer = document.getElementById('buildings-list');
             listContainer.innerHTML = '';
-            
+
             // Сортировка зданий: сначала альянса, потом замки игроков по имени
             const sortedBuildings = [...buildings].sort((a, b) => {
                 const configA = buildingConfig[a.type];
                 const configB = buildingConfig[b.type];
-                
+
                 if (configA.type === 'alliance' && configB.type !== 'alliance') return -1;
                 if (configA.type !== 'alliance' && configB.type === 'alliance') return 1;
-                
+
                 if (a.type === 'castle' && b.type === 'castle') {
                     return (a.playerName || '').localeCompare(b.playerName || '');
                 }
-                
+
                 return 0;
             });
-            
+
             sortedBuildings.forEach(building => {
                 const listItem = document.createElement('div');
                 listItem.className = 'list-item';
@@ -786,68 +922,68 @@
                 if (selectedBuilding === building.id) {
                     listItem.classList.add('selected');
                 }
-                
+
                 // Создание информации о здании
                 const info = document.createElement('div');
                 info.innerHTML = `${building.icon} ${translations[currentLang][building.type]}`;
                 if (building.type === 'castle' && building.playerName) {
                     info.innerHTML += `: ${building.playerName}`;
                 }
-                
+
                 // Создание кнопок действий
                 const actions = document.createElement('div');
-                
+
                 if (building.type === 'castle') {
                     const renameBtn = document.createElement('button');
                     renameBtn.textContent = translations[currentLang].rename;
                     renameBtn.addEventListener('click', () => showRenameModal(building.id));
                     actions.appendChild(renameBtn);
                 }
-                
+
                 const deleteBtn = document.createElement('button');
                 deleteBtn.textContent = translations[currentLang].delete;
                 deleteBtn.addEventListener('click', () => deleteBuilding(building.id));
                 actions.appendChild(deleteBtn);
-                
+
                 listItem.appendChild(info);
                 listItem.appendChild(actions);
-                
+
                 // Добавление обработчика щелчка для выбора здания
                 listItem.addEventListener('click', (e) => {
                     if (!e.target.closest('button')) {
                         selectBuilding(building.id);
                     }
                 });
-                
+
                 listContainer.appendChild(listItem);
             });
         }
-        
+
         // Перерисовка всех зданий
         function redrawAllBuildings() {
             // Удаление всех существующих зданий и областей
             const grid = document.getElementById('grid');
             document.querySelectorAll('.building, .building-area').forEach(el => el.remove());
-          // Повторное добавление всех зданий на сетку
+            // Повторное добавление всех зданий на сетку
             buildings.forEach(building => {
                 addBuildingToGrid(building);
             });
         }
-        
+
         // Обновление языка интерфейса
         function updateLanguage() {
             // Заголовок страницы
             document.getElementById('title').textContent = translations[currentLang].title;
             document.title = translations[currentLang].title;
-            
+
             // Заголовки разделов
             document.getElementById('buildings-header').textContent = translations[currentLang].buildingsHeader;
             document.getElementById('buildings-list-header').textContent = translations[currentLang].buildingsListHeader;
-            
+
             // Заголовки модальных окон
             document.getElementById('modal-title').textContent = translations[currentLang].modalTitle;
             document.getElementById('rename-modal-title').textContent = translations[currentLang].renameModalTitle;
-            
+
             // Кнопки
             document.querySelectorAll('[data-key]').forEach(el => {
                 const key = el.getAttribute('data-key');
@@ -855,7 +991,7 @@
                     el.textContent = translations[currentLang][key];
                 }
             });
-            
+
             // Названия зданий в панели инструментов
             document.querySelectorAll('.building-name').forEach(el => {
                 const key = el.getAttribute('data-key');
@@ -863,106 +999,347 @@
                     el.textContent = translations[currentLang][key];
                 }
             });
-            
+
             // Лейбл для ввода размера сетки
             document.getElementById('grid-size-label').textContent = translations[currentLang].gridSizeLabel;
-            
+
             // Плейсхолдер для ввода имени игрока
             document.getElementById('playerNameInput').placeholder = translations[currentLang].playerName;
-            
+
             // Обновление списка зданий
             updateBuildingsList();
-            
+
             document.getElementById('saveButton').textContent = translations[currentLang].saveButton;
         }
-        
-    // Сохранение состояния в base64 и создание ссылки
-    function saveStateToBase64() {
-        // Подготовка данных для сохранения (только нужные поля)
-        const stateToSave = buildings.map(b => ({
-            type: b.type,
-            x: b.x,
-            y: b.y,
-            playerName: b.playerName || ''
-        }));
-        
-        // Преобразование в JSON и затем в base64
-        const jsonState = JSON.stringify(stateToSave);
-        const base64State = btoa(encodeURIComponent(jsonState));
-        
-        // Создание ссылки с хэшем
-        const url = `${window.location.origin}${window.location.pathname}#${base64State}`;
-        
-        // Копирование ссылки в буфер обмена
-        navigator.clipboard.writeText(url).then(() => {
-            alert(currentLang === 'ru' ? 'Ссылка скопирована в буфер обмена!' : 'Link copied to clipboard!');
-        }).catch(err => {
-            console.error('Не удалось скопировать ссылку:', err);
-            // Показать ссылку пользователю, если не удалось скопировать
-            alert(currentLang === 'ru' ? 
-                `Не удалось скопировать ссылку автоматически. Вот ваша ссылка:\n${url}` : 
-                `Failed to copy link automatically. Here is your link:\n${url}`);
-        });
-        
-        return url;
-    }
 
-    // Загрузка состояния из base64
-    function loadStateFromBase64(base64State) {
-        try {
-            // Декодирование base64 в JSON
-            const jsonState = decodeURIComponent(atob(base64State));
-            const loadedState = JSON.parse(jsonState);
-            
-            // Очистка текущих зданий
-            buildings.forEach(b => {
-                const buildingEl = document.getElementById(`building-${b.id}`);
-                if (buildingEl) buildingEl.remove();
-                
-                if (b.areaSize > 0) {
-                    const areaEl = document.getElementById(`area-${b.id}`);
-                    if (areaEl) areaEl.remove();
+        // Сохранение состояния в base64 и создание ссылки
+        function saveStateToBase64() {
+            // Подготовка данных для сохранения (только нужные поля)
+            const stateToSave = buildings.map(b => ({
+                type: b.type,
+                x: b.x,
+                y: b.y,
+                playerName: b.playerName || '',
+                // Добавляем width и height для мертвых зон
+                ...(b.type === 'deadzone' ? { width: b.width, height: b.height } : {})
+            }));
+
+            // Преобразование в JSON и затем в base64
+            const jsonState = JSON.stringify(stateToSave);
+            const base64State = btoa(encodeURIComponent(jsonState));
+
+            // Создание ссылки с хэшем
+            const url = `${window.location.origin}${window.location.pathname}#${base64State}`;
+
+            // Копирование ссылки в буфер обмена
+            navigator.clipboard.writeText(url).then(() => {
+                alert(currentLang === 'ru' ? 'Ссылка скопирована в буфер обмена!' : 'Link copied to clipboard!');
+            }).catch(err => {
+                console.error('Не удалось скопировать ссылку:', err);
+                // Показать ссылку пользователю, если не удалось скопировать
+                alert(currentLang === 'ru' ?
+                    `Не удалось скопировать ссылку автоматически. Вот ваша ссылка:\n${url}` :
+                    `Failed to copy link automatically. Here is your link:\n${url}`);
+            });
+
+            return url;
+        }
+
+        // Загрузка состояния из base64
+        function loadStateFromBase64(base64State) {
+            try {
+                // Декодирование base64 в JSON
+                const jsonState = decodeURIComponent(atob(base64State));
+                const loadedState = JSON.parse(jsonState);
+
+                // Очистка текущих зданий
+                buildings.forEach(b => {
+                    const buildingEl = document.getElementById(`building-${b.id}`);
+                    if (buildingEl) buildingEl.remove();
+
+                    if (b.areaSize > 0) {
+                        const areaEl = document.getElementById(`area-${b.id}`);
+                        if (areaEl) areaEl.remove();
+                    }
+                });
+
+                buildings = [];
+                selectedBuilding = null;
+
+                // Загрузка зданий из сохраненного состояния
+                loadedState.forEach(savedBuilding => {
+                    const config = buildingConfig[savedBuilding.type];
+                    if (!config) return;
+
+                    const newBuilding = {
+                        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                        type: savedBuilding.type,
+                        x: savedBuilding.x,
+                        y: savedBuilding.y,
+                        playerName: savedBuilding.playerName || '',
+                        size: config.size,
+                        areaSize: config.areaSize,
+                        icon: config.icon
+                    };
+
+                    buildings.push(newBuilding);
+                    addBuildingToGrid(newBuilding);
+                });
+
+                updateBuildingsList();
+                return true;
+            } catch (error) {
+                console.error('Ошибка при загрузке состояния:', error);
+                return false;
+            }
+        }
+
+        // Проверка location hash при загрузке страницы
+        function checkLocationHash() {
+            if (window.location.hash) {
+                const base64State = window.location.hash.slice(1); // Убираем символ # из начала
+                loadStateFromBase64(base64State);
+            }
+        }
+
+        function makeDeadZoneResizable(buildingEl, building) {
+            if (building.type !== 'deadzone') return;
+
+            // Добавим свойства width и height вместо единого size
+            if (!building.width) building.width = building.size || 1;
+            if (!building.height) building.height = building.size || 1;
+
+            // Create resize handle
+            const resizeHandle = document.createElement('div');
+            resizeHandle.className = 'resize-handle';
+            buildingEl.appendChild(resizeHandle);
+
+            // Add resize functionality
+            resizeHandle.addEventListener('mousedown', (e) => {
+                e.stopPropagation(); // Prevent dragging the building
+
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const startWidth = building.width;
+                const startHeight = building.height;
+
+                const handleMouseMove = (moveEvent) => {
+                    const deltaX = Math.floor((moveEvent.clientX - startX) / cellSize);
+                    const deltaY = Math.floor((moveEvent.clientY - startY) / cellSize);
+
+                    // Обновляем width и height независимо друг от друга
+                    const newWidth = Math.max(1, Math.min(gridSize - building.x, startWidth + deltaX));
+                    const newHeight = Math.max(1, Math.min(gridSize - building.y, startHeight + deltaY));
+
+                    building.width = newWidth;
+                    building.height = newHeight;
+
+                    // Update the building's visual size
+                    buildingEl.style.width = `${building.width * cellSize}px`;
+                    buildingEl.style.height = `${building.height * cellSize}px`;
+                };
+
+                const handleMouseUp = () => {
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    document.removeEventListener('mouseup', handleMouseUp);
+                };
+
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+            });
+
+            // Add touch support for resizing
+            resizeHandle.addEventListener('touchstart', (e) => {
+                e.stopPropagation();
+
+                const touch = e.touches[0];
+                const startX = touch.clientX;
+                const startY = touch.clientY;
+                const startWidth = building.width;
+                const startHeight = building.height;
+
+                const handleTouchMove = (touchEvent) => {
+                    const touch = touchEvent.touches[0];
+                    const deltaX = Math.floor((touch.clientX - startX) / cellSize);
+                    const deltaY = Math.floor((touch.clientY - startY) / cellSize);
+
+                    // Обновляем width и height независимо друг от друга
+                    const newWidth = Math.max(1, Math.min(gridSize - building.x, startWidth + deltaX));
+                    const newHeight = Math.max(1, Math.min(gridSize - building.y, startHeight + deltaY));
+
+                    building.width = newWidth;
+                    building.height = newHeight;
+
+                    buildingEl.style.width = `${building.width * cellSize}px`;
+                    buildingEl.style.height = `${building.height * cellSize}px`;
+                };
+
+                const handleTouchEnd = () => {
+                    document.removeEventListener('touchmove', handleTouchMove);
+                    document.removeEventListener('touchend', handleTouchEnd);
+                };
+
+                document.addEventListener('touchmove', handleTouchMove);
+                document.addEventListener('touchend', handleTouchEnd);
+            });
+        }
+
+        function setupTouchDragAndDrop() {
+            const buildingItems = document.querySelectorAll('.building-item');
+            const grid = document.getElementById('grid');
+
+            buildingItems.forEach(item => {
+                item.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    item.classList.add('dragging');
+
+                    // Создаем плавающий элемент с подсказкой
+                    const tooltip = document.createElement('div');
+                    tooltip.className = 'tooltip';
+                    tooltip.textContent = item.querySelector('.building-name').textContent;
+                    document.body.appendChild(tooltip);
+
+                    const updateTooltipPosition = (clientX, clientY) => {
+                        tooltip.style.position = 'absolute';
+                        tooltip.style.left = `${clientX}px`;
+                        tooltip.style.top = `${clientY + 30}px`;
+                    };
+
+                    const touch = e.touches[0];
+                    updateTooltipPosition(touch.clientX, touch.clientY);
+
+                    const handleTouchMove = (moveEvent) => {
+                        const touch = moveEvent.touches[0];
+                        updateTooltipPosition(touch.clientX, touch.clientY);
+                    };
+
+                    const handleTouchEnd = (endEvent) => {
+                        item.classList.remove('dragging');
+                        document.body.removeChild(tooltip);
+
+                        document.removeEventListener('touchmove', handleTouchMove);
+                        document.removeEventListener('touchend', handleTouchEnd);
+
+                        const touch = endEvent.changedTouches[0];
+                        const rect = grid.getBoundingClientRect();
+
+                        if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+                            touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+
+                            const x = Math.floor((touch.clientX - rect.left) / cellSize);
+                            const y = Math.floor((touch.clientY - rect.top) / cellSize);
+                            const type = item.dataset.type;
+
+                            if (type === 'castle') {
+                                showPlayerNameModal(x, y);
+                            } else {
+                                createBuilding(type, x, y);
+                            }
+                        }
+                    };
+
+                    document.addEventListener('touchmove', handleTouchMove);
+                    document.addEventListener('touchend', handleTouchEnd);
+                });
+            });
+        }
+
+        function addTouchHandlersToBuilding(buildingEl, building) {
+            buildingEl.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                selectBuilding(building.id);
+
+                const touch = e.touches[0];
+                const startX = touch.clientX;
+                const startY = touch.clientY;
+                const startBuildingX = building.x;
+                const startBuildingY = building.y;
+
+                const handleTouchMove = (moveEvent) => {
+                    const touch = moveEvent.touches[0];
+                    const deltaX = Math.floor((touch.clientX - startX) / cellSize);
+                    const deltaY = Math.floor((touch.clientY - startY) / cellSize);
+
+                    const newX = Math.max(0, Math.min(gridSize - building.size, startBuildingX + deltaX));
+                    const newY = Math.max(0, Math.min(gridSize - building.size, startBuildingY + deltaY));
+
+                    // Temporarily remove building for overlap check
+                    const index = buildings.findIndex(b => b.id === building.id);
+                    const tempBuilding = buildings.splice(index, 1)[0];
+
+                    if (!checkOverlap(newX, newY, building.size)) {
+                        building.x = newX;
+                        building.y = newY;
+                        updateBuilding(building);
+                    }
+
+                    // Return building to array
+                    buildings.splice(index, 0, tempBuilding);
+                };
+
+                const handleTouchEnd = () => {
+                    document.removeEventListener('touchmove', handleTouchMove);
+                    document.removeEventListener('touchend', handleTouchEnd);
+                };
+
+                document.addEventListener('touchmove', handleTouchMove);
+                document.addEventListener('touchend', handleTouchEnd);
+            });
+        }
+
+        function setupTouchEvents() {
+            const gridContainer = document.querySelector('.grid-container');
+            let initialDistance = 0;
+            let initialCellSize = cellSize;
+
+            gridContainer.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 2) {
+                    initialDistance = Math.hypot(
+                        e.touches[0].clientX - e.touches[1].clientX,
+                        e.touches[0].clientY - e.touches[1].clientY
+                    );
+                    initialCellSize = cellSize;
                 }
             });
-            
-            buildings = [];
-            selectedBuilding = null;
-            
-            // Загрузка зданий из сохраненного состояния
-            loadedState.forEach(savedBuilding => {
-                const config = buildingConfig[savedBuilding.type];
-                if (!config) return;
-                
-                const newBuilding = {
-                    id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-                    type: savedBuilding.type,
-                    x: savedBuilding.x,
-                    y: savedBuilding.y,
-                    playerName: savedBuilding.playerName || '',
-                    size: config.size,
-                    areaSize: config.areaSize,
-                    icon: config.icon
-                };
-                
-                buildings.push(newBuilding);
-                addBuildingToGrid(newBuilding);
-            });
-            
-            updateBuildingsList();
-            return true;
-        } catch (error) {
-            console.error('Ошибка при загрузке состояния:', error);
-            return false;
-        }
-    }
 
-    // Проверка location hash при загрузке страницы
-    function checkLocationHash() {
-        if (window.location.hash) {
-            const base64State = window.location.hash.slice(1); // Убираем символ # из начала
-            loadStateFromBase64(base64State);
+            gridContainer.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 2) {
+                    e.preventDefault(); // Prevent page scrolling
+
+                    const currentDistance = Math.hypot(
+                        e.touches[0].clientX - e.touches[1].clientX,
+                        e.touches[0].clientY - e.touches[1].clientY
+                    );
+
+                    const scaleFactor = currentDistance / initialDistance;
+                    cellSize = Math.max(6, Math.min(36, initialCellSize * scaleFactor));
+
+                    setupGrid();
+                    redrawAllBuildings();
+                }
+            });
         }
-    }
+
+        function checkScreenSize() {
+            const isMobile = window.matchMedia('(max-width: 768px)').matches;
+            document.body.classList.toggle('mobile-view', isMobile);
+
+            // Обновляем интерфейс в зависимости от размера экрана
+            if (isMobile) {
+                // Для мобильных устройств показываем только иконки
+                document.querySelectorAll('.building-item .building-name').forEach(name => {
+                    name.dataset.originalText = name.textContent;
+                });
+            } else {
+                // Для больших экранов восстанавливаем текст
+                document.querySelectorAll('.building-item .building-name').forEach(name => {
+                    if (name.dataset.originalText) {
+                        name.textContent = name.dataset.originalText;
+                    }
+                });
+            }
+        }
     </script>
 </body>
+
 </html>
