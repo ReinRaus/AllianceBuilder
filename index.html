@@ -254,6 +254,20 @@
             z-index: 11;
         }
 
+        .deadzone-name {
+            font-size: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            padding: 2px;
+            background-color: rgba(255, 255, 255, 0.7);
+        }
+
         @media (max-width: 768px) {
             .main-container {
                 flex-direction: column;
@@ -452,7 +466,7 @@
             farm: { icon: '🌾', size: 2, areaSize: 0, limit: 1, type: 'alliance' },
             warehouse: { icon: '🏭', size: 2, areaSize: 0, limit: 1, type: 'alliance' },
             castle: { icon: '🏯', size: 2, areaSize: 0, limit: -1, type: 'player' },
-            deadzone: { icon: '⚠️', size: 1, areaSize: 0, limit: -1, type: 'special' }
+            deadzone: { icon: '⚠️', size: 1, areaSize: 0, limit: -1, type: 'special', bgcolor: 'rgba(144, 238, 144, 0.5)' },
         };
 
         // Состояние приложения
@@ -726,6 +740,15 @@
                 const icon = document.createElement('div');
                 icon.textContent = building.icon;
                 buildingEl.appendChild(icon);
+
+                // Add name display for deadzone if it exists
+                if (building.type === 'deadzone' && building.playerName) {
+                    const nameEl = document.createElement('div');
+                    nameEl.className = 'deadzone-name';
+                    nameEl.textContent = building.playerName;
+                    nameEl.style.marginLeft = '5px';
+                    buildingEl.appendChild(nameEl);
+                }
             }
 
             // Если это замок игрока, добавить имя
@@ -745,6 +768,7 @@
                 if (!building.width) building.width = building.size;
                 if (!building.height) building.height = building.size;
 
+                buildingEl.style.backgroundColor = buildingConfig[building.type].bgcolor;
                 buildingEl.style.width = `${building.width * cellSize}px`;
                 buildingEl.style.height = `${building.height * cellSize}px`;
 
@@ -836,12 +860,26 @@
                 }
             }
 
+            // if (building.type === 'deadzone') {
+            //     buildingEl.style.width = `${building.width * cellSize}px`;
+            //     buildingEl.style.height = `${building.height * cellSize}px`;
+            // } else {
+            //     buildingEl.style.width = `${building.size * cellSize}px`;
+            //     buildingEl.style.height = `${building.size * cellSize}px`;
+            // }
+
             if (building.type === 'deadzone') {
-                buildingEl.style.width = `${building.width * cellSize}px`;
-                buildingEl.style.height = `${building.height * cellSize}px`;
-            } else {
-                buildingEl.style.width = `${building.size * cellSize}px`;
-                buildingEl.style.height = `${building.size * cellSize}px`;
+                let nameEl = buildingEl.querySelector('.deadzone-name');
+                if (!nameEl && building.playerName) {
+                    nameEl = document.createElement('div');
+                    nameEl.className = 'deadzone-name';
+                    nameEl.style.marginLeft = '5px';
+                    buildingEl.appendChild(nameEl);
+                }
+
+                if (nameEl) {
+                    nameEl.textContent = building.playerName || '';
+                }
             }
         }
 
@@ -898,6 +936,7 @@
         // Обновление списка зданий
         function updateBuildingsList() {
             const listContainer = document.getElementById('buildings-list');
+            const actions = document.createElement('div');
             listContainer.innerHTML = '';
 
             // Сортировка зданий: сначала альянса, потом замки игроков по имени
@@ -933,7 +972,14 @@
                 // Создание кнопок действий
                 const actions = document.createElement('div');
 
-                if (building.type === 'castle') {
+                // if (building.type === 'castle') {
+                //     const renameBtn = document.createElement('button');
+                //     renameBtn.textContent = translations[currentLang].rename;
+                //     renameBtn.addEventListener('click', () => showRenameModal(building.id));
+                //     actions.appendChild(renameBtn);
+                // }
+
+                if (building.type === 'castle' || building.type === 'deadzone') {
                     const renameBtn = document.createElement('button');
                     renameBtn.textContent = translations[currentLang].rename;
                     renameBtn.addEventListener('click', () => showRenameModal(building.id));
@@ -1341,5 +1387,5 @@
         }
     </script>
 </body>
-
+    
 </html>
