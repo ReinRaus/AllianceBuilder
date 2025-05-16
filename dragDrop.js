@@ -1,217 +1,241 @@
-import { buildingConfig } from './config.js';
+import { buildingConfig, translations } from './config.js'; // translations импортирован, но не используется в этом файле. POTENTIAL_ISSUE: Лишний импорт?
 import * as state from './state.js';
 import { createBuilding, checkOverlap } from './buildingManager.js';
-import { showPlayerNameModal } from './uiManager.js';
+// showPlayerNameModal не используется после рефакторинга создания замка
+// import { showPlayerNameModal } from './uiManager.js';
 
-// Создает DOM-элемент призрака (здание и область)
+// --- Управление "призраком" здания на сетке ---
+
+/**
+ * Создает DOM-элементы для "призрака" здания и его области влияния.
+ * @param {string} type Тип здания.
+ * @param {number} x Координата X на сетке.
+ * @param {number} y Координата Y на сетке.
+ * @returns {object} Объект с DOM-элементами { ghostEl, ghostAreaEl } и данными призрака { x, y, size, areaSize }.
+ */
 function createGhostDOM(type, x, y) {
     const config = buildingConfig[type];
     if (!config) return { ghostEl: null, ghostAreaEl: null };
 
-    // Корректировка позиции для правильного отображения призрака
-    if (config.size > 1) {
-        x = Math.max(0, Math.min(state.gridSize - config.size, x));
-        y = Math.max(0, Math.min(state.gridSize - config.size, y));
-    } else {
-        x = Math.max(0, Math.min(state.gridSize - 1, x));
-        y = Math.max(0, Math.min(state.gridSize - 1, y));
-    }
+    // Корректировка позиции, чтобы призрак не выходил за пределы сетки
+    const effectiveSize = config.size; // Для призрака всегда используем базовый размер
+    x = Math.max(0, Math.min(state.gridSize - effectiveSize, x));
+    y = Math.max(0, Math.min(state.gridSize - effectiveSize, y));
 
+    // Создание основного элемента призрака
     const ghostEl = document.createElement('div');
     ghostEl.className = 'building ghost-building';
-    ghostEl.id = 'ghost-building'; // Уникальный ID для легкого удаления
+    ghostEl.id = 'ghost-building'; // ID для легкого удаления
     ghostEl.style.left = `${x * state.cellSize}px`;
     ghostEl.style.top = `${y * state.cellSize}px`;
-    ghostEl.style.width = `${config.size * state.cellSize}px`;
-    ghostEl.style.height = `${config.size * state.cellSize}px`;
+    ghostEl.style.width = `${effectiveSize * state.cellSize}px`;
+    ghostEl.style.height = `${effectiveSize * state.cellSize}px`;
     const icon = document.createElement('div');
+    icon.className = 'icon';
     icon.textContent = config.icon;
     ghostEl.appendChild(icon);
 
-    const hasOverlap = checkOverlap(x, y, config.size, config.size);
+    // Проверка на перекрытие и установка соответствующего класса
+    const hasOverlap = checkOverlap(x, y, effectiveSize, effectiveSize);
     ghostEl.classList.toggle('invalid-position', hasOverlap);
 
+    // Создание призрака области влияния, если она есть
     let ghostAreaEl = null;
     if (config.areaSize > 0) {
         ghostAreaEl = document.createElement('div');
         ghostAreaEl.className = 'building-area ghost-area';
-        ghostAreaEl.id = 'ghost-area'; // Уникальный ID
-        const offset = Math.floor((config.areaSize - config.size) / 2);
-        const areaX = x - offset;
-        const areaY = y - offset;
-        ghostAreaEl.style.left = `${areaX * state.cellSize}px`;
-        ghostAreaEl.style.top = `${areaY * state.cellSize}px`;
+        ghostAreaEl.id = 'ghost-area';
+        const offset = Math.floor((config.areaSize - effectiveSize) / 2);
+        ghostAreaEl.style.left = `${(x - offset) * state.cellSize}px`;
+        ghostAreaEl.style.top = `${(y - offset) * state.cellSize}px`;
         ghostAreaEl.style.width = `${config.areaSize * state.cellSize}px`;
         ghostAreaEl.style.height = `${config.areaSize * state.cellSize}px`;
     }
-    return { ghostEl, ghostAreaEl, x, y, size: config.size, areaSize: config.areaSize };
+    return { ghostEl, ghostAreaEl, x, y, size: effectiveSize, areaSize: config.areaSize };
 }
 
-// Обновляет (создает или перемещает) призрак на сетке
+/**
+ * Обновляет (создает или перемещает) "призрак" здания на сетке.
+ * @param {string} type Тип перетаскиваемого здания.
+ * @param {number} x Координата X на сетке.
+ * @param {number} y Координата Y на сетке.
+ */
 function updateGhostBuildingOnGrid(type, x, y) {
-    removeGhostBuildingFromGrid(); // Сначала удаляем старый, если есть
+    removeGhostBuildingFromGrid(); // Удаляем предыдущий призрак, если он был
     const grid = document.getElementById('grid');
     const { ghostEl, ghostAreaEl, ...ghostData } = createGhostDOM(type, x, y);
 
     if (ghostAreaEl) grid.appendChild(ghostAreaEl);
     if (ghostEl) grid.appendChild(ghostEl);
 
-    if (ghostEl) {
-        state.setGhostBuilding({ type, ...ghostData }); // Сохраняем данные о призраке в state
-    } else {
-        state.setGhostBuilding(null);
-    }
+    // Сохраняем информацию о текущем призраке в состоянии
+    state.setGhostBuilding(ghostEl ? { type, ...ghostData } : null);
 }
 
-// Удаляет призрак с сетки
+/** Удаляет "призрак" здания и его область с сетки. */
 function removeGhostBuildingFromGrid() {
     const ghostEl = document.getElementById('ghost-building');
     if (ghostEl) ghostEl.remove();
     const ghostArea = document.getElementById('ghost-area');
     if (ghostArea) ghostArea.remove();
-    state.setGhostBuilding(null);
+    state.setGhostBuilding(null); // Очищаем информацию о призраке в состоянии
 }
 
-// Создание DOM-элемента для иконки-призрака у курсора
+// --- Управление иконкой-призраком у курсора ---
+
+/** Создает DOM-элемент для иконки-призрака, следующей за курсором (если еще не создан). */
 export function createCursorGhostIconDOM() {
-    if (!state.cursorGhostIcon) { // Создаем только один раз
+    if (!state.cursorGhostIcon) {
         const iconEl = document.createElement('div');
         iconEl.id = 'cursor-ghost-icon';
         document.body.appendChild(iconEl);
-        state.setCursorGhostIcon(iconEl); // Сохраняем ссылку в state
+        state.setCursorGhostIcon(iconEl); // Сохраняем ссылку на DOM-элемент в состоянии
     }
     if (state.cursorGhostIcon) state.cursorGhostIcon.style.display = 'none'; // Изначально скрыт
 }
 
-// Позиционирование иконки-призрака у курсора
+/**
+ * Позиционирует иконку-призрак рядом с курсором.
+ * @param {MouseEvent|DragEvent} e Событие мыши или перетаскивания.
+ */
 function positionCursorGhostIcon(e) {
     if (state.cursorGhostIcon && state.cursorGhostIcon.style.display === 'block') {
+        // Смещаем иконку относительно курсора для лучшей видимости
         state.cursorGhostIcon.style.left = `${e.clientX + 10}px`;
         state.cursorGhostIcon.style.top = `${e.clientY + 10}px`;
     }
 }
 
-// Показывает иконку-призрак у курсора
+/**
+ * Показывает иконку-призрак с указанным текстом (иконкой здания) и позиционирует ее.
+ * @param {string} iconText Текст (иконка) для отображения.
+ * @param {MouseEvent|DragEvent} e Событие для начального позиционирования.
+ */
 function showCursorGhostIcon(iconText, e) {
     if (state.cursorGhostIcon) {
         state.cursorGhostIcon.textContent = iconText;
         state.cursorGhostIcon.style.display = 'block';
-        positionCursorGhostIcon(e); // Сразу устанавливаем позицию
+        positionCursorGhostIcon(e);
     }
 }
 
-// Скрывает иконку-призрак у курсора
+/** Скрывает иконку-призрак у курсора. */
 function hideCursorGhostIcon() {
     if (state.cursorGhostIcon) {
         state.cursorGhostIcon.style.display = 'none';
     }
 }
 
-// Настройка перетаскивания
+// --- Настройка логики Drag and Drop ---
+
+/** Инициализирует обработчики событий для перетаскивания зданий с панели на сетку. */
 export function setupDragAndDrop() {
-    const buildingItems = document.querySelectorAll('.building-item');
-    const grid = document.getElementById('grid');
-    const emptyDragImage = new Image();
+    const buildingItems = document.querySelectorAll('.building-item'); // Элементы зданий на панели
+    const grid = document.getElementById('grid'); // Основная сетка
+    const emptyDragImage = new Image(); // Пустое изображение для кастомного вида перетаскивания
     emptyDragImage.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
-    let currentDraggedToolbarItem = null; // Для стилизации элемента в тулбаре
-    let currentDragIconText = ''; // Текст для иконки у курсора
+    let currentDraggedToolbarItem = null; // Ссылка на перетаскиваемый элемент с панели (для стилизации)
+    let currentDragIconText = '';       // Текст (иконка) для призрака у курсора
 
-    // Глобальный обработчик для обновления позиции иконки-призрака
+    // Глобальный обработчик для обновления позиции иконки-призрака во время перетаскивания
     const globalDragOverHandler = (e) => {
-        if (state.draggedType) {
+        if (state.draggedType) { // Если что-то активно перетаскивается
             positionCursorGhostIcon(e);
         }
     };
 
     buildingItems.forEach(item => {
+        // Начало перетаскивания элемента с панели
         item.addEventListener('dragstart', (e) => {
-            if (state.isGridRotated) {
-                // Вызываем функцию, которая находится в app.js или uiManager.js
-                // для сброса поворота. Это требует экспорта/импорта.
-                // Проще всего здесь напрямую манипулировать классом и состоянием.
+            if (state.isGridRotated) { // Сброс поворота сетки, если он был активен
                 state.setIsGridRotated(false);
                 document.querySelector('.grid-container').classList.remove('rotated');
-                // Можно обновить текст кнопки поворота, если есть доступ
-                // const rotateButton = document.getElementById('rotateGridButton');
-                // if (rotateButton) rotateButton.textContent = "Повернуть сетку";
+                // POTENTIAL_ISSUE: Нужно вызвать updateRotateButtonVisualState() из uiManager.
             }
 
-            e.dataTransfer.setData('text/plain', item.dataset.type);
-            e.dataTransfer.setDragImage(emptyDragImage, 0, 0); // Используем пустое изображение
+            e.dataTransfer.setData('text/plain', item.dataset.type); // Сохраняем тип здания
+            e.dataTransfer.setDragImage(emptyDragImage, 0, 0); // Используем невидимое изображение по умолчанию
 
-            item.classList.add('dragging', 'dragging-source-transparent');
+            item.classList.add('dragging', 'dragging-source-transparent'); // Стилизация исходного элемента
             state.setDraggedType(item.dataset.type);
             currentDraggedToolbarItem = item;
-            currentDragIconText = buildingConfig[state.draggedType]?.icon || '❓';
+            currentDragIconText = buildingConfig[state.draggedType]?.icon || '❓'; // Иконка для призрака
 
             showCursorGhostIcon(currentDragIconText, e); // Показываем иконку у курсора
             document.addEventListener('dragover', globalDragOverHandler); // Начинаем отслеживать ее позицию
         });
 
+        // Завершение перетаскивания (успешное или нет)
         item.addEventListener('dragend', () => {
             if (currentDraggedToolbarItem) {
                 currentDraggedToolbarItem.classList.remove('dragging', 'dragging-source-transparent');
             }
-            removeGhostBuildingFromGrid(); // Убираем полный призрак с сетки
-            hideCursorGhostIcon();        // Убираем иконку у курсора
-            state.setDraggedType(null);
+            removeGhostBuildingFromGrid(); // Убираем "полный" призрак с сетки
+            hideCursorGhostIcon();         // Убираем иконку у курсора
+            state.setDraggedType(null);    // Сбрасываем тип перетаскиваемого здания
             currentDraggedToolbarItem = null;
             currentDragIconText = '';
             document.removeEventListener('dragover', globalDragOverHandler);
         });
     });
 
+    // Курсор входит на территорию сетки во время перетаскивания
     grid.addEventListener('dragenter', (e) => {
         if (state.draggedType) {
-            e.preventDefault();
-            hideCursorGhostIcon(); // Скрываем маленькую иконку, т.к. сейчас будет полный призрак
+            e.preventDefault(); // Необходимо для события drop
+            hideCursorGhostIcon(); // Скрываем маленькую иконку, т.к. будет показан "полный" призрак
         }
     });
 
+    // Курсор перемещается над сеткой во время перетаскивания
     grid.addEventListener('dragover', (e) => {
-        e.preventDefault(); // Обязательно для drop
+        e.preventDefault(); // Необходимо для события drop
         if (state.draggedType) {
             const rect = grid.getBoundingClientRect();
+            // Расчет координат ячейки под курсором
             const x = Math.floor((e.clientX - rect.left) / state.cellSize);
             const y = Math.floor((e.clientY - rect.top) / state.cellSize);
-            updateGhostBuildingOnGrid(state.draggedType, x, y); // Показываем/обновляем ПОЛНЫЙ призрак
+            updateGhostBuildingOnGrid(state.draggedType, x, y); // Обновляем "полный" призрак
         }
     });
 
+    // Курсор покидает территорию сетки во время перетаскивания
     grid.addEventListener('dragleave', (e) => {
-        // Условие, чтобы призрак не исчезал при переходе на дочерние элементы внутри grid
         const gridRect = grid.getBoundingClientRect();
+        // Проверяем, что курсор действительно покинул сетку, а не перешел на дочерний элемент
         if (state.draggedType &&
             (e.clientX <= gridRect.left || e.clientX >= gridRect.right ||
              e.clientY <= gridRect.top || e.clientY >= gridRect.bottom)) {
-            removeGhostBuildingFromGrid();
-            if (state.draggedType) { // Если все еще тащим (не было drop)
+            removeGhostBuildingFromGrid(); // Убираем "полный" призрак
+            if (state.draggedType) { // Если все еще идет перетаскивание (не было drop)
                 showCursorGhostIcon(currentDragIconText, e); // Показываем маленькую иконку снова
             }
         }
     });
 
+    // Здание "брошено" на сетку
     grid.addEventListener('drop', (e) => {
         e.preventDefault();
-        // Все призраки (и у курсора, и на сетке) будут убраны в 'dragend'
-        const type = e.dataTransfer.getData('text/plain');
+        const type = e.dataTransfer.getData('text/plain'); // Получаем тип здания
+        if (!type) return; // Если тип не определен, ничего не делаем
+
         const rect = grid.getBoundingClientRect();
         const x = Math.floor((e.clientX - rect.left) / state.cellSize);
         const y = Math.floor((e.clientY - rect.top) / state.cellSize);
 
+        // Логика создания здания в зависимости от его типа
         if (type === 'castle') {
-            // Определяем следующий номер для замка
             const castleCount = state.buildings.filter(b => b.type === 'castle').length;
-            const defaultName = `${castleCount + 1}`;
+            // Используем translations для префикса имени замка, если он есть, или номер по умолчанию
+            const prefix = translations[state.currentLang]?.defaultCastleNamePrefix || ""; // POTENTIAL_ISSUE: defaultCastleNamePrefix может быть не везде
+            const defaultName = `${prefix}${castleCount + 1}`.trim();
             createBuilding(type, x, y, defaultName);
         } else if (type === 'deadzone') {
-            // Для мертвой зоны имя по умолчанию пустое, или можно сделать как для замка
-            // const deadzoneCount = state.buildings.filter(b => b.type === 'deadzone').length;
-            // const defaultName = `Зона ${deadzoneCount + 1}`;
-            createBuilding(type, x, y, ''); // Пустое имя по умолчанию для Deadzone
+            createBuilding(type, x, y, ''); // Мертвая зона по умолчанию без имени
         } else {
-            createBuilding(type, x, y);
+            createBuilding(type, x, y); // Для остальных зданий имя не требуется
         }
+        // Призраки будут автоматически убраны в событии 'dragend'
     });
 }

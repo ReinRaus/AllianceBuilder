@@ -1,17 +1,37 @@
-// Состояние приложения
-export let buildings = [];
-export let selectedBuilding = null;
-export let gridSize = 50;
-export let cellSize = 24; // px
-export let ghostBuilding = null; // { type, x, y, size, areaSize }
-export let draggedType = null; // string, тип перетаскиваемого элемента с тулбара
-export let currentLang = 'ru';
-export let cursorGhostIcon = null; // DOM-элемент для иконки, следующей за курсором
-export let isGridRotated = false;
-export let showDistanceToHG = false; // Новый флаг для режима "До адских врат"
+// --- Глобальное состояние приложения ---
 
-// Функции-сеттеры для изменения состояния.
-// Это хороший паттерн, если в будущем понадобится логика при изменении состояния.
+/** @type {Array<Object>} Массив объектов размещенных зданий. */
+export let buildings = [];
+/** @type {string|null} ID выделенного в данный момент здания. */
+export let selectedBuilding = null;
+
+/** @type {number} Текущий размер сетки (количество ячеек по ширине/высоте). */
+export let gridSize = 50;
+/** @type {number} Размер одной ячейки сетки в пикселях. */
+export let cellSize = 24;
+
+/** @type {Object|null} Объект, представляющий "призрак" здания при перетаскивании на сетку.
+ * Содержит: { type, x, y, size, areaSize }
+ */
+export let ghostBuilding = null;
+/** @type {string|null} Тип здания, перетаскиваемого с панели инструментов. */
+export let draggedType = null;
+
+/** @type {string} Текущий язык интерфейса (например, 'ru', 'en'). */
+export let currentLang = 'ru';
+/** @type {HTMLElement|null} DOM-элемент для иконки-призрака, следующей за курсором. */
+export let cursorGhostIcon = null;
+
+/** @type {boolean} Флаг, указывающий, повернута ли сетка. */
+export let isGridRotated = false;
+/** @type {boolean} Флаг, указывающий, включен ли режим отображения расстояния до Адских Врат. */
+export let showDistanceToHG = false;
+
+
+// --- Функции-сеттеры для изменения состояния ---
+// Использование сеттеров позволяет инкапсулировать логику изменения состояния,
+// если в будущем потребуется добавить какие-либо проверки или побочные эффекты.
+
 export function setBuildings(newBuildings) {
     buildings = newBuildings;
 }

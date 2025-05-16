@@ -1,14 +1,18 @@
-// Локализация
+/**
+ * Объект с переводами интерфейса на разные языки.
+ * Ключи верхнего уровня - коды языков (ru, en, pt_br, de).
+ * Внутренние ключи соответствуют элементам интерфейса или строкам текста.
+ */
 export const translations = {
     ru: {
         title: "Планировщик зданий альянса",
-        buildingsHeader: "Здания ⇆",
-        buildingsListHeader: "Список зданий",
-        modalTitle: "Имя игрока",
-        renameModalTitle: "Переименовать замок",
+        buildingsHeader: "Здания", // Заголовок панели выбора зданий
+        buildingsListHeader: "Список зданий", // Заголовок списка размещенных зданий
+        modalTitle: "Имя игрока", // Заголовок модального окна при создании замка
+        renameModalTitle: "Переименовать замок", // Заголовок модального окна при переименовании
         gridSizeLabel: "Размер сетки:",
         apply: "Применить",
-        save: "Сохранить", // Общая кнопка "Сохранить"
+        save: "Сохранить", // Общий текст для кнопок сохранения в модалках
         fortress: "Крепость альянса",
         outpost: "Форпост альянса",
         hellgates: "Адские врата",
@@ -17,26 +21,27 @@ export const translations = {
         warehouse: "Склад",
         castle: "Замок игрока",
         deadzone: "Мертвая зона",
-        rename: "Переименовать",
-        delete: "Удалить",
-        playerName: "Имя игрока",
-        saveButton: "Сохранить", // Кнопка для шаринга состояния
+        rename: "Переименовать", // Текст для кнопки переименования в списке
+        delete: "Удалить", // Текст для кнопки удаления в списке
+        playerName: "Имя игрока", // Плейсхолдер для инпута имени
+        saveButton: "Сохранить", // Текст для кнопки "Сохранить/Поделиться состоянием" в шапке
+        // defaultCastleNamePrefix: "Замок ", // POTENTIAL_ISSUE: Не используется в текущем JS (имя замка просто номер)
         rotateGrid: "Повернуть сетку",
         resetRotation: "Сбросить поворот",
-        distanceToHGLabel: "До Адских Врат", // Текст для кнопки
-        distanceUnit: "", // Единица измерения расстояния (клеток)
+        distanceToHGLabel: "До Адских Врат",
+        distanceUnit: "", // Единица измерения "клетки" для русского языка
         hellgatesNotPlaced: "Врата не установлены",
-        cannotShiftFurther: "Невозможно сдвинуть здания дальше.",
+        cannotShiftFurther: "Невозможно сдвинуть здания дальше."
     },
     en: {
         title: "Alliance Buildings Planner",
-        buildingsHeader: "Buildings ⇆",
+        buildingsHeader: "Buildings",
         buildingsListHeader: "Buildings List",
         modalTitle: "Player Name",
         renameModalTitle: "Rename Castle",
         gridSizeLabel: "Grid Size:",
         apply: "Apply",
-        save: "Save", // General save button
+        save: "Save",
         fortress: "Alliance Fortress",
         outpost: "Alliance Outpost",
         hellgates: "Hell Gates",
@@ -48,15 +53,16 @@ export const translations = {
         rename: "Rename",
         delete: "Delete",
         playerName: "Player Name",
-        saveButton: "Save", // Button for sharing state
+        saveButton: "Save",
+        // defaultCastleNamePrefix: "Castle ", // POTENTIAL_ISSUE: Не используется
         rotateGrid: "Rotate Grid",
         resetRotation: "Reset Rotation",
-        distanceToHGLabel: "To Hell Gates", // Text for the button
-        distanceUnit: "cells", // Distance unit
+        distanceToHGLabel: "To Hell Gates",
+        distanceUnit: "cells",
         hellgatesNotPlaced: "Gates not placed",
-        cannotShiftFurther: "Cannot shift buildings further.",
+        cannotShiftFurther: "Cannot shift buildings further."
     },
-    pt_br: { // Португальский (Бразилия)
+    pt_br: {
         title: "Planejador de Construções da Aliança",
         buildingsHeader: "Construções",
         buildingsListHeader: "Lista de Construções",
@@ -76,8 +82,8 @@ export const translations = {
         rename: "Renomear",
         delete: "Excluir",
         playerName: "Nome do Jogador",
-        saveButton: "Salvar", // Для кнопки "поделиться состоянием"
-        defaultCastleNamePrefix: "Castelo ",
+        saveButton: "Salvar",
+        defaultCastleNamePrefix: "Castelo ", // POTENTIAL_ISSUE: Не используется, но оставлен для примера
         rotateGrid: "Girar Grade",
         resetRotation: "Resetar Rotação",
         distanceToHGLabel: "Aos Portões Infernais",
@@ -85,7 +91,7 @@ export const translations = {
         hellgatesNotPlaced: "Portões não colocados",
         cannotShiftFurther: "Não é possível mover mais as construções."
     },
-    de: { // Немецкий
+    de: {
         title: "Allianz Gebäudeplaner",
         buildingsHeader: "Gebäude",
         buildingsListHeader: "Gebäudeliste",
@@ -105,18 +111,22 @@ export const translations = {
         rename: "Umbenennen",
         delete: "Löschen",
         playerName: "Spielername",
-        saveButton: "Speichern", // Для кнопки "поделиться состоянием"
-        defaultCastleNamePrefix: "Burg ",
+        saveButton: "Speichern",
+        defaultCastleNamePrefix: "Burg ", // POTENTIAL_ISSUE: Не используется
         rotateGrid: "Raster drehen",
         resetRotation: "Drehung zurücksetzen",
         distanceToHGLabel: "Zu den Höllentoren",
         distanceUnit: "Felder",
         hellgatesNotPlaced: "Tore nicht platziert",
         cannotShiftFurther: "Gebäude können nicht weiter verschoben werden."
-    },
+    }
 };
 
-// Конфигурация зданий
+/**
+ * Конфигурация зданий.
+ * Определяет их свойства: иконку, размер на сетке, размер области влияния (если есть),
+ * лимит на количество, тип (альянсовое, игрока, специальное) и цвет фона для особых типов.
+ */
 export const buildingConfig = {
     fortress: { icon: '🏰', size: 3, areaSize: 15, limit: 1, type: 'alliance' },
     outpost: { icon: '🚩', size: 2, areaSize: 10, limit: 5, type: 'alliance' },
@@ -124,6 +134,6 @@ export const buildingConfig = {
     hospital: { icon: '🏥', size: 2, areaSize: 0, limit: 1, type: 'alliance' },
     farm: { icon: '🌾', size: 2, areaSize: 0, limit: 1, type: 'alliance' },
     warehouse: { icon: '🏭', size: 2, areaSize: 0, limit: 1, type: 'alliance' },
-    castle: { icon: '🏯', size: 2, areaSize: 0, limit: -1, type: 'player' },
+    castle: { icon: '🏯', size: 2, areaSize: 0, limit: -1, type: 'player' }, // limit -1 означает безлимитное количество
     deadzone: { icon: '⚠️', size: 1, areaSize: 0, limit: -1, type: 'special', bgcolor: 'rgba(144, 238, 144, 0.5)' },
 };

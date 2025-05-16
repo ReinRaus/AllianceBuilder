@@ -1,25 +1,88 @@
+/* Глобальные переменные и сброс стилей */
 :root {
-    --grid-size: 50;
-    --cell-size: 12px;
-    --alliance-color: rgba(0, 128, 255, 0.3);
+    /* --grid-size: 50;  POTENTIAL_ISSUE: Не используется в CSS, только в JS */
+    /* --cell-size: 12px; POTENTIAL_ISSUE: Не используется в CSS, только в JS */
+    --alliance-color: rgba(0, 128, 255, 0.3); /* Цвет области влияния альянсовых зданий */
 }
 
 body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
     display: flex;
     flex-direction: column;
     height: 100vh;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
 }
 
+/* Общие стили для кнопок и инпутов, если нужны */
+input,
+button {
+    margin: 5px 0;
+    padding: 8px;
+    /* POTENTIAL_ISSUE: Глобальное применение padding и margin может быть не всегда желательным.
+                       Лучше стилизовать конкретные классы кнопок/инпутов.
+                       Частично это уже сделано (header-btn, control-btn и т.д.) */
+}
+
+/* --- Стили Хедера --- */
 header {
-    background-color: #333;
-    color: white;
-    padding: 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 10px;
+    background-color: #333;
+    color: white;
+}
+
+header h1 {
+    margin: 0; /* Убрать стандартный отступ у заголовка */
+    font-size: 1.5em; /* Примерный размер */
+}
+
+.header-controls { /* Блок с кнопкой "Сохранить" и настройкой размера сетки */
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.header-btn { /* Кнопка "Сохранить" в шапке */
+    padding: 8px 16px;
+    font-size: 14px;
+    color: white;
+    background-color: #4CAF50;
+    border: none;
+    border-radius: 4px;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.grid-size-input {
+    width: 50px;
+    height: 30px; /* POTENTIAL_ISSUE: Высота может не совпадать с кнопками, лучше использовать padding для выравнивания */
+    padding: 0 5px; /* Используется padding, но height тоже задан */
+}
+
+.view-actions { /* Кнопки "Повернуть сетку", "До Адских Врат" */
+    display: flex;
+    gap: 10px;
+    margin-left: 20px;
+}
+
+.control-btn { /* Общий стиль для кнопок управления видом */
+    padding: 8px 12px;
+    font-size: 14px;
+    color: #333; /* Текст по умолчанию темный на светлом фоне */
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.control-btn.active { /* Стиль для активной кнопки управления видом */
+    color: white;
+    background-color: #4CAF50;
+    border-color: #3e8e41;
 }
 
 .language-switcher {
@@ -28,428 +91,392 @@ header {
 }
 
 .language-btn {
+    padding: 5px 10px;
+    color: white;
     background: none;
     border: 1px solid white;
-    color: white;
-    padding: 5px 10px;
-    cursor: pointer;
     border-radius: 4px;
+    cursor: pointer;
 }
 
 .language-btn.active {
-    background-color: white;
     color: #333;
+    background-color: white;
 }
 
+/* --- Стили Основного контейнера --- */
 .main-container {
     display: flex;
-    flex: 1;
-    overflow: hidden;
+    flex: 1; /* Занимает все доступное пространство по высоте */
+    overflow: hidden; /* Предотвращает выход контента за пределы */
 }
 
-.grid-container {
-    flex: 1;
-    overflow: auto;
-    position: relative;
-    background-color: #f0f0f0;
-    user-select: none;
-    touch-action: none;
-}
-
-.building-item.dragging {
-    cursor: grabbing;
-}
-
-.building-item.dragging-source-transparent {
-    opacity: 0.1 !important; /* Прозрачность для оригинального элемента в панели на время перетаскивания */
-                             /* Можете выбрать другое значение, например 0.5 */
-}
-
-.building-item.dragging-over-grid {
-    opacity: 0; /* Или opacity: 0; для полного исчезновения */
-    transition: opacity 0.1s ease-out; /* Плавный переход */
-}
-
-.grid {
-    display: grid;
-    background-color: white;
-    margin: 20px;
-    position: relative;
-}
-
-.grid-cell {
-    border: 1px solid #ddd;
-    box-sizing: border-box;
-    position: relative;
-}
-
+/* --- Стили Панели инструментов (Toolbar) --- */
 .toolbar {
-    width: 200px;
-    background-color: #f8f8f8;
-    padding: 10px;
-    border-left: 1px solid #ddd;
-    overflow-y: auto;
-    display: flex; /* Чтобы h2 и .shift-controls / .building-item шли в столбик */
+    display: flex;
     flex-direction: column;
+    width: 200px;
+    padding: 10px;
+    background-color: #f8f8f8;
+    border-left: 1px solid #ddd; /* REFACTOR_SUGGESTION: Обычно border-right для левой панели */
+    overflow-y: auto;
 }
 
-.shift-controls {
-    display: flex; /* Кнопки в один ряд */
-    justify-content: space-around; /* Распределить кнопки по ширине */
-    margin-bottom: 15px; /* Отступ от списка зданий */
-    padding: 5px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background-color: #f9f9f9;
+.toolbar h2 {
+    margin-top: 0; /* Убрать стандартный отступ */
+    font-size: 1.2em;
 }
 
-.shift-btn {
-    padding: 8px 10px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    border: 1px solid #ddd;
-    background-color: white;
-    border-radius: 3px;
-    min-width: 30px; /* Чтобы кнопки были примерно одинаковой ширины */
-    text-align: center;
-}
-
-.shift-btn:hover {
-    background-color: #e9e9e9;
-}
-
-.shift-btn:active {
-    background-color: #dcdcdc;
-}
-
-.building-item {
+.building-item { /* Элемент здания в тулбаре для перетаскивания */
+    display: flex;
+    align-items: center;
+    gap: 10px;
     padding: 10px;
     margin-bottom: 10px;
     background-color: white;
     border: 1px solid #ddd;
     border-radius: 4px;
     cursor: grab;
-    display: flex;
-    align-items: center;
-    gap: 10px;
 }
 
 .building-item .icon {
     font-size: 24px;
 }
 
-.building-list {
-    background-color: #f8f8f8;
+.building-item .building-name {
+    /* Стили для имени здания в тулбаре, если нужны */
+}
+
+/* Состояния перетаскивания для элемента из тулбара */
+.building-item.dragging {
+    cursor: grabbing;
+}
+.building-item.dragging-source-transparent {
+    opacity: 0.1 !important; /* Делаем исходный элемент почти невидимым */
+}
+/* REFACTOR_SUGGESTION: .building-item.dragging-over-grid не используется в JS, возможно, устарел */
+/* .building-item.dragging-over-grid {
+    opacity: 0;
+    transition: opacity 0.1s ease-out;
+} */
+
+.shift-controls { /* Контейнер для кнопок смещения всех зданий */
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 15px;
+    padding: 5px;
+    background-color: #f9f9f9;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.shift-btn { /* Кнопки смещения (стрелки) */
+    min-width: 30px;
+    padding: 8px 10px;
+    font-size: 16px;
+    font-weight: bold;
+    text-align: center;
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.shift-btn:hover {
+    background-color: #e9e9e9;
+}
+.shift-btn:active {
+    background-color: #dcdcdc;
+}
+
+/* --- Стили Сетки (Grid) --- */
+.grid-container { /* Контейнер, обеспечивающий прокрутку сетки */
+    position: relative; /* Для позиционирования призрака и зданий */
+    flex: 1;
+    overflow: auto;
+    background-color: #f0f0f0; /* Фон области за сеткой */
+    user-select: none; /* Запрет выделения текста на сетке */
+    touch-action: none; /* Отключение стандартных жестов браузера (важно для pinch-zoom) */
+}
+
+.grid { /* Сама сетка */
+    display: grid; /* Используется CSS Grid для ячеек */
+    position: relative; /* Для позиционирования зданий внутри */
+    margin: 20px;
+    background-color: white;
+    /* Свойства grid-template-columns/rows задаются из JS */
+}
+
+.grid-cell { /* Отдельная ячейка сетки */
+    position: relative; /* Для возможного будущего контента внутри ячейки */
+    box-sizing: border-box;
+    border: 1px solid #ddd;
+    /* Размеры width/height задаются из JS */
+}
+
+/* Поворот сетки */
+.grid-container.rotated .grid {
+    transform: rotate(-45deg);
+    transform-origin: center center;
+    transition: transform 0.3s ease-in-out;
+}
+/* POTENTIAL_ISSUE: При повороте сетки, если она не квадратная или выходит за пределы видимой области,
+                    могут появиться пустые пространства или обрезаться углы.
+                    Также, overflow: auto на .grid-container может вести себя непредсказуемо с повернутым контентом. */
+
+/* --- Стили Зданий на сетке (Placed Buildings) --- */
+.building { /* Общий стиль для размещенного здания */
+    position: absolute; /* Позиционируются относительно #grid */
+    display: flex;
+    /* flex-direction: column;  REFACTOR_SUGGESTION: Если иконка всегда сверху, а имя снизу, то column. Если только иконка или только имя, то не обязательно. */
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    background-color: white; /* Фон по умолчанию, может переопределяться (deadzone, castle) */
+    border: 2px solid #333;
+    font-size: 24px; /* Размер иконки по умолчанию */
+    user-select: none;
+    cursor: move;
+    overflow: hidden; /* Обрезает контент, выходящий за пределы здания */
+    z-index: 10;
+    /* Размеры width/height и позиция left/top задаются из JS */
+}
+
+.building.selected { /* Стиль для выделенного здания */
+    border-color: #1890ff;
+    box-shadow: 0 0 10px rgba(24, 144, 255, 0.5);
+}
+
+.building-area { /* Область влияния (например, у крепости) */
+    position: absolute;
+    background-color: var(--alliance-color);
+    pointer-events: none; /* Не должна мешать взаимодействию с сеткой/зданиями */
+    z-index: 5; /* Под зданиями, но над сеткой */
+}
+
+.player-castle-name { /* Имя замка игрока */
+    width: 100%; /* Занимает всю ширину родительского .building */
+    padding: 0 2px; /* Небольшие отступы по бокам */
+    font-size: 10px;
+    line-height: 1.2;
+    text-align: center;
+    overflow-wrap: break-word; /* Перенос длинных слов */
+    word-break: break-word;    /* Дополнительный контроль переноса */
+    /* POTENTIAL_ISSUE: Если .building имеет overflow:hidden и фиксированную высоту,
+                        длинное имя может не поместиться и обрезаться. */
+}
+
+.deadzone-name { /* Имя мертвой зоны */
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 2px;
+    font-size: 10px;
+    line-height: 1.1;
+    text-align: center;
+    background-color: rgba(255, 255, 255, 0.7);
+    overflow-wrap: break-word;
+    word-break: break-word;
+    /* POTENTIAL_ISSUE: Если имя очень длинное, может перекрыть иконку '⚠️' */
+}
+
+.resize-handle { /* Элемент для изменения размера мертвой зоны */
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 10px;
+    height: 10px;
+    background-color: #1890ff;
+    cursor: nwse-resize;
+    z-index: 11; /* Выше основного контента здания */
+}
+
+/* --- Стили Призраков (Ghost Elements) --- */
+.ghost-building { /* Призрак здания при перетаскивании на сетку */
+    opacity: 0.7;
+    border-style: dashed;
+    pointer-events: none;
+}
+.ghost-building.invalid-position { /* Если призрак в недопустимой позиции */
+    background-color: rgba(255, 0, 0, 0.2);
+    border-color: red;
+}
+
+.ghost-area { /* Призрак области влияния */
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+#cursor-ghost-icon { /* Иконка-призрак, следующая за курсором */
+    position: fixed;
+    padding: 2px 5px;
+    font-size: 28px;
+    color: #333; /* Цвет иконки */
+    background-color: rgba(255, 255, 255, 0.7);
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    pointer-events: none;
+    z-index: 2000; /* Выше всех остальных элементов */
+}
+
+/* --- Стили Списка размещенных зданий --- */
+.building-list-panel { /* Контейнер для списка зданий под сеткой */
+    height: 150px; /* Фиксированная высота, появляется скролл если не влезает */
     padding: 10px;
+    background-color: #f8f8f8;
     border-top: 1px solid #ddd;
-    height: 150px;
     overflow-y: auto;
 }
 
-.tooltip {
-    background-color: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 5px 10px;
-    border-radius: 4px;
-    font-size: 14px;
-    pointer-events: none;
-    z-index: 1000;
-    white-space: nowrap;
+.building-list-panel h3 {
+    margin-top: 0;
+    font-size: 1.1em;
 }
 
-.list-item {
+.list-item { /* Элемент в списке зданий */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     padding: 8px;
     margin-bottom: 5px;
     background-color: white;
     border: 1px solid #ddd;
     border-radius: 4px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
 }
-
 .list-item.selected {
     background-color: #e6f7ff;
     border-color: #91d5ff;
 }
-
-.building {
-    position: absolute;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: white;
-    border: 2px solid #333;
-    box-sizing: border-box;
-    cursor: move;
-    z-index: 10;
-    font-size: 24px;
-    overflow: hidden;
-    user-select: none;
+.list-item div:first-child { /* Контейнер с иконкой и именем в списке */
+    flex-grow: 1; /* Занимает доступное пространство, отодвигая кнопки */
+}
+.list-item button { /* Кнопки "Переименовать", "Удалить" в списке */
+    margin-left: 5px;
+    padding: 4px 8px; /* Меньший padding для кнопок в списке */
 }
 
-.building.selected {
-    border-color: #1890ff;
-    box-shadow: 0 0 10px rgba(24, 144, 255, 0.5);
-}
 
-.building-area {
-    position: absolute;
-    background-color: var(--alliance-color);
-    z-index: 5;
-    pointer-events: none;
-}
-
-.player-castle-name {
-    font-size: 10px; /* Можно оставить или немного увеличить */
-    text-align: center;
-    /* white-space: nowrap; */ /* УДАЛИТЬ или закомментировать */
-    /* overflow: hidden; */   /* УДАЛИТЬ или закомментировать */
-    /* text-overflow: ellipsis; */ /* УДАЛИТЬ или закомментировать */
-
-    /* Добавляем для переноса слов */
-    overflow-wrap: break-word; /* Предпочтительнее */
-    word-break: break-word;    /* Как альтернатива или дополнение, если overflow-wrap не работает везде */
-    
-    /* Можно немного увеличить высоту строки для читаемости */
-    line-height: 1.2;
-    
-    /* Убедимся, что контейнер может расти по высоте */
-    /* Если родительский .building имеет фиксированную высоту и overflow: hidden,
-       то текст все равно может обрезаться. Нужно, чтобы .building мог вместить текст. */
-    /* padding: 2px; */ /* Небольшой отступ, если нужен */
-    /* max-width: 100%; */ /* Чтобы не вылезал за пределы родителя */
-}
-
+/* --- Стили Модальных окон --- */
 .modal {
-    display: none;
+    display: none; /* Показывается через JS */
     position: fixed;
-    z-index: 100;
-    left: 0;
     top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: rgba(0, 0, 0, 0.5); /* Полупрозрачный фон */
+    z-index: 100; /* Над большинством элементов, но под #cursor-ghost-icon */
 }
 
 .modal-content {
-    background-color: white;
-    margin: 15% auto;
+    width: 300px; /* Фиксированная ширина контента модалки */
+    margin: 15% auto; /* Центрирование по вертикали и горизонтали */
     padding: 20px;
-    border-radius: 4px;
-    width: 300px;
-}
-
-.close {
-    float: right;
-    cursor: pointer;
-    font-size: 20px;
-}
-
-input,
-button {
-    padding: 8px;
-    margin: 5px 0;
-}
-
-.config-panel {
-    position: fixed;
-    right: 20px;
-    bottom: 20px;
     background-color: white;
-    border: 1px solid #ddd;
-    padding: 10px;
     border-radius: 4px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2); /* Тень для модалки */
 }
 
-header-buttons {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+.modal-content h2 {
+    margin-top: 0;
 }
 
-.grid-size-input {
-    width: 50px;
-    height: 30px;
-    padding: 0 5px;
-}
-
-.header-btn {
-    background-color: #4CAF50;
-    border: none;
-    color: white;
-    padding: 8px 16px;
-    text-align: center;
-    text-decoration: none;
-    display: inline-block;
-    font-size: 14px;
-    margin: 4px 2px;
+.close { /* Кнопка "крестик" для закрытия модалки */
+    float: right;
+    font-size: 20px;
+    font-weight: bold; /* Сделать крестик жирнее */
+    line-height: 1; /* Для лучшего выравнивания */
+    color: #aaa; /* Цвет крестика */
     cursor: pointer;
-    border-radius: 4px;
+}
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
 }
 
-.resize-handle {
-    position: absolute;
-    width: 10px;
-    height: 10px;
-    background-color: #1890ff;
-    bottom: 0;
-    right: 0;
-    cursor: nwse-resize;
-    z-index: 11;
+.modal input[type="text"] { /* Инпут в модалке */
+    width: calc(100% - 18px); /* Занимает всю ширину минус padding и border инпута */
+    margin-bottom: 10px;
+}
+.modal button { /* Кнопка "Сохранить" в модалке */
+    width: 100%;
 }
 
-.deadzone-name {
-    font-size: 10px;
-    /* white-space: nowrap; */ /* УДАЛИТЬ */
-    /* overflow: hidden; */   /* УДАЛИТЬ */
-    /* text-overflow: ellipsis; */ /* УДАЛИТЬ */
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    text-align: center;
-    padding: 2px;
-    background-color: rgba(255, 255, 255, 0.7);
-
-    overflow-wrap: break-word;
-    word-break: break-word;
-    line-height: 1.1; /* Может потребоваться чуть меньше для абсолютного позиционирования */
-    /* max-height: 100%; */ /* Чтобы не вылезал за пределы родителя, если имя очень длинное */
-                             /* Но это может обрезать текст, если он не помещается. */
-}
-
+/* --- Медиа-запросы для Адаптивности --- */
 @media (max-width: 768px) {
+    header {
+        flex-direction: column; /* Элементы хедера в столбик на малых экранах */
+        align-items: stretch; /* Растянуть дочерние блоки по ширине */
+    }
+    .header-controls, .view-actions, .language-switcher {
+        margin-top: 10px;
+        justify-content: center; /* Центрировать кнопки в своих блоках */
+    }
+    .view-actions {
+        margin-left: 0; /* Убрать отступ на мобильных */
+    }
+
     .main-container {
         flex-direction: column;
     }
 
     .toolbar {
-        width: 100%;
-        border-left: none;
-        border-top: 1px solid #ddd;
-        display: flex;
-        flex-wrap: wrap;
+        width: 100%; /* Тулбар на всю ширину */
+        flex-direction: row; /* Элементы тулбара (заголовок, здания, кнопки смещения) в ряд */
+        flex-wrap: wrap; /* Разрешить перенос элементов */
         justify-content: space-around;
+        border-left: none;
+        border-top: 1px solid #ddd; /* Граница сверху вместо боковой */
+        order: 1; /* Тулбар после grid-container в потоке flex */
+    }
+    .toolbar h2 {
+        width: 100%; /* Заголовок тулбара на всю ширину */
+        text-align: center;
+        margin-bottom: 10px;
     }
 
-    .building-item {
-        width: 80px;
+    .building-item { /* Уменьшаем элементы зданий в тулбаре */
+        width: auto; /* Авто-ширина, чтобы помещались иконки */
+        padding: 8px;
         margin: 5px;
+        justify-content: center;
+    }
+    .building-item .building-name {
+        display: none; /* Скрываем имя здания в тулбаре на мобильных */
+    }
+    .building-item .icon {
+        font-size: 28px; /* Увеличиваем иконку */
+    }
+    /* POTENTIAL_ISSUE: .building-item.dragging .building-name - этот стиль может не понадобиться,
+                        если имя всегда скрыто на мобильных в тулбаре. */
+    /* .building-item.dragging .building-name { ... } */
+
+
+    .shift-controls {
+        width: 100%; /* На всю ширину */
+        margin-top: 10px;
+        order: 1; /* Кнопки смещения после списка зданий */
     }
 
     .grid-container {
-        height: 60vh;
+        height: auto; /* Высота по контенту или можно задать vh */
+        min-height: 50vh; /* Минимальная высота для сетки */
+        order: 0; /* Сетка перед тулбаром */
     }
 
-    .building-item .building-name {
-        display: none;
+    .building-list-panel {
+        height: 120px; /* Уменьшаем высоту списка на мобильных */
     }
 
-    .building-item {
-        width: auto;
-        justify-content: center;
-        padding: 8px;
-    }
-
-    .building-item .icon {
-        font-size: 28px;
-    }
-
-    .building-item.dragging .building-name {
-        display: block;
-        position: absolute;
-        top: 100%;
-        left: 50%;
-        transform: translateX(-50%);
-        background-color: rgba(255, 255, 255, 0.9);
-        padding: 4px 8px;
-        border-radius: 4px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        white-space: nowrap;
-        z-index: 100;
+    .modal-content {
+        width: 80%; /* Модалка шире на мобильных */
+        margin: 20% auto;
     }
 }
 
-.ghost-building {
-    opacity: 0.7;
-    border-style: dashed;
-    pointer-events: none;
-}
+/* POTENTIAL_ISSUE: Стиль .tooltip не используется в предоставленном JS. Если он нужен, его стоит оставить. */
+/* .tooltip { ... } */
 
-/* Новый стиль для иконки-призрака, следующей за курсором */
-#cursor-ghost-icon {
-    position: fixed; /* Или absolute, если родитель body */
-    pointer-events: none; /* Чтобы не мешала другим событиям */
-    z-index: 2000; /* Выше всего остального */
-    font-size: 28px; /* Размер иконки, как в тулбаре или чуть больше */
-    /* Можно добавить небольшой фон или тень для лучшей видимости */
-    background-color: rgba(255, 255, 255, 0.7);
-    padding: 2px 5px;
-    border-radius: 4px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-}
-
-.ghost-area {
-    opacity: 0.5;
-    pointer-events: none;
-}
-
-.invalid-position {
-    border-color: red;
-    background-color: rgba(255, 0, 0, 0.2);
-}
-
-.grid-container.rotated .grid {
-    transform: rotate(-45deg);
-    /* Может потребоваться коррекция margin или transform-origin
-       чтобы вращение выглядело хорошо */
-    transform-origin: center center;
-    transition: transform 0.3s ease-in-out;
-}
-
-/* Опционально: если нужно, чтобы контент зданий (иконки, текст) оставался горизонтальным */
-/* .grid-container.rotated .building > div,
-.grid-container.rotated .building .player-castle-name,
-.grid-container.rotated .building .deadzone-name {
-    transform: rotate(45deg);
-    display: inline-block; 
-} */
-/* Этот обратный поворот может выглядеть странно для многострочного текста или сложных иконок.
-   Возможно, лучше оставить контент повернутым вместе со зданием. */
-
-/* Для призрака */
-.grid-container.rotated .ghost-building {
-    transform: rotate(-45deg); /* Если сам #grid не вращается, а только его содержимое */
-                               /* Если #grid вращается, то этот transform не нужен,
-                                  т.к. призрак будет дочерним элементом #grid */
-}
-/* Если мы вращаем .grid, то .ghost-building, будучи его потомком, уже будет повернут.
-   Но если .ghost-building добавляется в .grid-container напрямую, тогда ему нужен свой rotate.
-   Сейчас призрак добавляется в #grid, так что отдельный transform ему не нужен,
-   если #grid уже повернут через класс .rotated на его родителе .grid-container.
-   Но важно, чтобы его left/top рассчитывались для НЕ повернутой сетки, а CSS сделает визуальный поворот.
-*/
-
-.header-actions {
-    display: flex;
-    gap: 10px;
-    margin-left: 20px; /* Или другой отступ от предыдущих элементов хедера */
-}
-
-.control-btn {
-    padding: 8px 12px;
-    border: 1px solid #ccc;
-    background-color: #f0f0f0;
-    cursor: pointer;
-    border-radius: 4px;
-    font-size: 14px;
-}
-
-.control-btn.active {
-    background-color: #4CAF50; /* Зеленый цвет для активного состояния */
-    color: white;
-    border-color: #3e8e41;
-}
+/* POTENTIAL_ISSUE: Стиль .config-panel не используется в HTML и JS. Если он не нужен, его можно удалить. */
+/* .config-panel { ... } */

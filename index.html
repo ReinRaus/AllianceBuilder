@@ -1,35 +1,44 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru"> <!-- Язык документа по умолчанию -->
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Alliance Buildings Planner</title>
+    <title>Alliance Buildings Planner</title> <!-- Заголовок будет обновляться JS -->
     <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
     <header>
         <h1 id="title">Планировщик зданий альянса</h1>
-        <div class="header-buttons">
-            <button id="saveButton" class="header-btn">Сохранить</button>
-            <label id="grid-size-label" for="gridSizeInput">Размер сетки:</label>
+
+        <!-- Элементы управления в шапке -->
+        <div class="header-controls"> <!-- Изменено имя класса для большей ясности -->
+            <button id="saveButton" class="header-btn" data-key="saveButton">Сохранить</button>
+            <label id="grid-size-label" for="gridSizeInput" data-key="gridSizeLabel">Размер сетки:</label>
             <input type="number" id="gridSizeInput" class="grid-size-input" min="10" max="100" value="50"/>
             <button id="applyGridSize" data-key="apply">Применить</button>
         </div>
-        <div class="header-actions"> <!-- Обертка для кнопок управления видом -->
+
+        <!-- Кнопки управления видом/режимами -->
+        <div class="view-actions"> <!-- Изменено имя класса -->
             <button id="rotateGridButton" class="control-btn" data-key="rotateGrid">Повернуть сетку</button>
             <button id="distanceToHGButton" class="control-btn" data-key="distanceToHGLabel">До Адских Врат</button>
-        </div> 
-    <div class="language-switcher">
-        <button class="language-btn" data-lang="en">EN</button>
-        <button class="language-btn active" data-lang="ru">RU</button>
-        <button class="language-btn" data-lang="de">DE</button>   <!-- Новая кнопка -->
-        <button class="language-btn" data-lang="pt_br">PT-BR</button> <!-- Новая кнопка -->
-    </div>
+        </div>
+
+        <!-- Переключатель языков -->
+        <div class="language-switcher">
+            <button class="language-btn" data-lang="en">EN</button>
+            <button class="language-btn active" data-lang="ru">RU</button>
+            <button class="language-btn" data-lang="de">DE</button>
+            <button class="language-btn" data-lang="pt_br">PT-BR</button>
+        </div>
     </header>
 
     <div class="main-container">
+        <!-- Панель инструментов со списком доступных зданий и кнопками смещения -->
         <div class="toolbar" id="toolbar">
-            <h2 id="buildings-header">Здания</h2>
+            <h2 id="buildings-header" data-key="buildingsHeader">Здания</h2>
+            
+            <!-- Элементы зданий для перетаскивания -->
             <div class="building-item" draggable="true" data-type="fortress">
                 <div class="icon">🏰</div>
                 <div class="building-name" data-key="fortress">Крепость альянса</div>
@@ -62,45 +71,53 @@
                 <div class="icon">⚠️</div>
                 <div class="building-name" data-key="deadzone">Мертвая зона</div>
             </div>
-            <!-- Кнопки смещения -->
+
+            <!-- Кнопки для массового смещения всех зданий на сетке -->
             <div class="shift-controls">
                 <button id="shiftUpButton" class="shift-btn" title="Сдвинуть всё вверх">↑</button>
                 <button id="shiftDownButton" class="shift-btn" title="Сдвинуть всё вниз">↓</button>
                 <button id="shiftLeftButton" class="shift-btn" title="Сдвинуть всё влево">←</button>
                 <button id="shiftRightButton" class="shift-btn" title="Сдвинуть всё вправо">→</button>
             </div>
-            </div>
+        </div>
 
-   
-
+        <!-- Контейнер для основной сетки строительства -->
         <div class="grid-container">
-            <div class="grid" id="grid"></div>
+            <div class="grid" id="grid">
+                <!-- Ячейки сетки генерируются JS -->
+            </div>
         </div>
     </div>
 
-    <div class="building-list">
-        <h3 id="buildings-list-header">Список зданий</h3>
-        <div id="buildings-list"></div>
+    <!-- Панель со списком размещенных зданий и действиями над ними -->
+    <div class="building-list-panel"> <!-- Изменено имя класса -->
+        <h3 id="buildings-list-header" data-key="buildingsListHeader">Список зданий</h3>
+        <div id="buildings-list">
+            <!-- Элементы списка генерируются JS -->
+        </div>
     </div>
 
+    <!-- Модальное окно для ввода имени игрока/названия зоны -->
     <div id="playerNameModal" class="modal">
         <div class="modal-content">
             <span class="close">&times;</span>
-            <h2 id="modal-title">Имя игрока</h2>
-            <input type="text" id="playerNameInput" placeholder="Введите имя игрока" />
+            <h2 id="modal-title" data-key="modalTitle">Имя игрока</h2> <!-- data-key добавлен для заголовка по умолчанию -->
+            <input type="text" id="playerNameInput" data-key="playerName" placeholder="Имя игрока" /> <!-- data-key для плейсхолдера -->
             <button id="savePlayerName" data-key="save">Сохранить</button>
         </div>
     </div>
 
+    <!-- Модальное окно для переименования замка/зоны -->
     <div id="renameModal" class="modal">
         <div class="modal-content">
             <span class="close">&times;</span>
-            <h2 id="rename-modal-title">Переименовать замок</h2>
-            <input type="text" id="renameInput" />
+            <h2 id="rename-modal-title" data-key="renameModalTitle">Переименовать замок</h2> <!-- data-key добавлен -->
+            <input type="text" id="renameInput" /> <!-- Плейсхолдер здесь не нужен, т.к. значение подставляется -->
             <button id="saveRename" data-key="save">Сохранить</button>
         </div>
     </div>
 
+    <!-- Подключение основного скрипта приложения как модуля -->
     <script type="module" src="app.js"></script>
 </body>
 </html>

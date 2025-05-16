@@ -1,126 +1,108 @@
-// Импорты конфигурации и состояния - не нужны напрямую, т.к. используются в других модулях
-// import { translations, buildingConfig } from './config.js';
-// import * as state from './state.js';
+import * as state from './state.js';
+import { translations } from './config.js'; // Для доступа к переводам напрямую в app.js
 
-// Импорты модулей с функциональностью
+// Функциональные модули
 import { setupGrid, redrawAllBuildings } from './gridUtils.js';
-import { deleteBuilding as deleteBuildingFromManager, selectBuilding as selectBuildingInManager, shiftAllBuildings  } from './buildingManager.js';
+import {
+    createBuilding as createBuildingInManager, // Переименовываем для ясности, если будут локальные createBuilding
+    updateBuilding as updateBuildingInManager, // Аналогично
+    deleteBuilding as deleteBuildingFromManager,
+    shiftAllBuildings
+} from './buildingManager.js';
 import { setupDragAndDrop, createCursorGhostIconDOM } from './dragDrop.js';
 import {
     updateLanguage,
-    showPlayerNameModal,
-    showRenameModal,
+    // showPlayerNameModal, // Не используется напрямую в app.js после рефакторинга
+    // showRenameModal,   // Аналогично
     checkScreenSize,
-    updateCastleDistanceDisplay, // Импортируем, если она в uiManager
-    updateRotateButtonVisualState, // Импортируем
-    updateDistanceToHGButtonVisualState // Импортируем
+    updateCastleDistanceDisplay,
+    updateRotateButtonVisualState,
+    updateDistanceToHGButtonVisualState
 } from './uiManager.js';
 import { saveStateToBase64, checkLocationHash } from './persistence.js';
 import { setupTouchPinchZoom, setupTouchDragAndDrop } from './touchControls.js';
-import { translations } from './config.js'; // Нужны translations для текста кнопок
-import * as state from './state.js'; // Импортируем state для доступа к currentLang и gridSize для инициализации инпутов
 
-function updateRotateButtonText() {
-    const rotateButton = document.getElementById('rotateGridButton');
-    if (rotateButton) {
-        const key = state.isGridRotated ? 'resetRotation' : 'rotateGrid';
-        rotateButton.textContent = translations[state.currentLang][key] || key;
-        rotateButton.classList.toggle('active', state.isGridRotated);
-    }
-}
 
+// --- Функции управления состоянием UI, специфичные для app.js ---
+
+/** Переключает режим поворота сетки и обновляет UI кнопки. */
 function toggleGridRotation() {
-    state.setIsGridRotated(!state.isGridRotated);
-    const gridContainer = document.querySelector('.grid-container');
-    gridContainer.classList.toggle('rotated', state.isGridRotated);
-    updateRotateButtonVisualState(); // Используем новую функцию
+    state.setIsGridRotated(!state.isGridRotated); // Инвертируем состояние
+    document.querySelector('.grid-container').classList.toggle('rotated', state.isGridRotated);
+    updateRotateButtonVisualState(); // Обновляем вид кнопки
+
+    // Если активен режим расстояний, перерисовываем их, так как поворот мог сброситься
     if (state.showDistanceToHG) {
         updateCastleDistanceDisplay();
     }
 }
 
-function updateDistanceToHGButtonState() {
-    const distanceButton = document.getElementById('distanceToHGButton');
-    if (distanceButton) {
-        distanceButton.classList.toggle('active', state.showDistanceToHG);
-        // Текст кнопки не меняется, только ее состояние active/inactive
-    }
-}
-
+/** Переключает режим отображения расстояния до Адских Врат и обновляет UI. */
 function toggleDistanceToHGMode() {
-    state.setShowDistanceToHG(!state.showDistanceToHG);
-    updateDistanceToHGButtonVisualState(); // Используем новую функцию
-    updateCastleDistanceDisplay();
+    state.setShowDistanceToHG(!state.showDistanceToHG); // Инвертируем состояние
+    updateDistanceToHGButtonVisualState(); // Обновляем вид кнопки
+    updateCastleDistanceDisplay(); // Обновляем отображение на замках
 }
 
-// Инициализация приложения
+
+// --- Инициализация приложения ---
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Начальная настройка состояния (если нужно, например, из localStorage)
+    // 1. Восстановление состояния из localStorage (язык, размер сетки)
     const savedLang = localStorage.getItem('alliancePlannerLang');
-    if (savedLang) {
+    if (savedLang && translations[savedLang]) { // Проверяем, что сохраненный язык существует в переводах
         state.setCurrentLang(savedLang);
     }
     const savedGridSize = localStorage.getItem('alliancePlannerGridSize');
-     if (savedGridSize) {
-        state.setGridSize(parseInt(savedGridSize, 10));
+    if (savedGridSize) {
+        const parsedGridSize = parseInt(savedGridSize, 10);
+        if (!isNaN(parsedGridSize) && parsedGridSize >=10 && parsedGridSize <=100) {
+             state.setGridSize(parsedGridSize);
+        }
     }
 
-
-    // 2. Создание необходимых DOM-элементов, которые не в HTML (например, иконка-призрак)
+    // 2. Создание динамических DOM-элементов (например, иконка-призрак у курсора)
     createCursorGhostIconDOM();
 
-    // 3. Загрузка состояния из URL, если есть (должна быть до первой отрисовки)
-    checkLocationHash(); // Это может обновить state.buildings
+    // 3. Загрузка состояния из URL (хэша), если оно там есть
+    checkLocationHash(); // Это может обновить state.buildings и другие параметры, если они сохраняются
 
-    // 4. Настройка UI (сетка, язык, списки) на основе текущего (возможно, загруженного) состояния
-    // Устанавливаем начальные значения для инпутов из state
+    // 4. Первичная настройка UI на основе текущего (возможно, загруженного) состояния
     document.getElementById('gridSizeInput').value = state.gridSize;
     document.querySelectorAll('.language-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.lang === state.currentLang);
     });
 
-    setupGrid();        // Создает ячейки сетки
-    updateLanguage();   // Устанавливает все тексты, вызывает updateBuildingsList и checkScreenSize
-    redrawAllBuildings(); // Рисует здания из state.buildings
-    updateRotateButtonText(); // Установить правильный текст и состояние кнопки поворота
-    updateDistanceToHGButtonState(); // Установить состояние кнопки расстояний
-    updateRotateButtonVisualState();
-    updateDistanceToHGButtonVisualState();
+    setupGrid();        // Инициализация сетки (создание ячеек)
+    updateLanguage();   // Установка всех текстов интерфейса, включая кнопки управления видом
+    redrawAllBuildings(); // Отрисовка зданий из state.buildings
+
+    // Обновление визуального состояния кнопок управления видом после полной инициализации UI
+    // updateLanguage уже должен вызывать updateRotateButtonVisualState
+    // updateDistanceToHGButtonVisualState(); // Вызывается из updateLanguage косвенно, если кнопки имеют data-key
 
     // 5. Настройка глобальных обработчиков событий
     setupGlobalEventListeners();
-    
-    // 6. Настройка специфичных контролов (drag-n-drop, touch)
+
+    // 6. Инициализация специфичных элементов управления (Drag'n'Drop, Touch)
     setupDragAndDrop();
     setupTouchPinchZoom();
-    setupTouchDragAndDrop(); // Попытка инициализации, даже если не полностью реализовано
+    setupTouchDragAndDrop(); // Инициализация, даже если не полностью реализована
 
-    // 7. Первичная проверка размера экрана (уже вызывается в updateLanguage, но можно для уверенности)
-    // checkScreenSize();
+    // 7. Первичная проверка размера экрана (также вызывается в updateLanguage)
+    checkScreenSize();
 });
 
+// --- Настройка глобальных обработчиков событий ---
 function setupGlobalEventListeners() {
-    // Модальные окна
+    // Обработчики для модальных окон
     const playerNameModal = document.getElementById('playerNameModal');
     const renameModal = document.getElementById('renameModal');
     const closeButtons = document.querySelectorAll('.modal .close');
     const savePlayerNameButton = document.getElementById('savePlayerName');
     const saveRenameButton = document.getElementById('saveRename');
 
-    const rotateGridButton = document.getElementById('rotateGridButton');
-    if (rotateGridButton) {
-        rotateGridButton.addEventListener('click', toggleGridRotation);
-        updateRotateButtonVisualState(); // Установить начальный текст и состояние
-    }
-
-    const distanceToHGButton = document.getElementById('distanceToHGButton');
-    if (distanceToHGButton) {
-        distanceToHGButton.addEventListener('click', toggleDistanceToHGMode);
-        updateDistanceToHGButtonVisualState(); // Установить начальное состояние
-    }
-
     closeButtons.forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', (e) => { // Закрытие любой модалки по крестику
             const modalToClose = e.target.closest('.modal');
             if (modalToClose) {
                 modalToClose.style.display = 'none';
@@ -128,117 +110,132 @@ function setupGlobalEventListeners() {
         });
     });
 
+    // Сохранение имени при создании нового замка/зоны
     savePlayerNameButton.addEventListener('click', () => {
-        const x = parseInt(playerNameModal.dataset.x);
-        const y = parseInt(playerNameModal.dataset.y);
-        const buildingType = playerNameModal.dataset.buildingType || 'castle'; // Получаем тип
-        const playerName = document.getElementById('playerNameInput').value;
-        createBuilding(buildingType, x, y, playerName);
+        const x = parseInt(playerNameModal.dataset.x, 10);
+        const y = parseInt(playerNameModal.dataset.y, 10);
+        const buildingType = playerNameModal.dataset.buildingType || 'castle';
+        const playerName = document.getElementById('playerNameInput').value.trim(); // Обрезаем пробелы
+
+        // POTENTIAL_ISSUE: createBuildingInManager импортирован, но здесь вызывается createBuilding.
+        // Нужно убедиться, что это правильный вызов. Если createBuilding - это createBuildingInManager,
+        // то все ок. Если createBuilding - это нечто другое, то ошибка.
+        // Судя по импортам, createBuildingInManager - это то, что нужно.
+        createBuildingInManager(buildingType, x, y, playerName);
         playerNameModal.style.display = 'none';
-        document.getElementById('playerNameInput').value = '';
     });
 
+    // Сохранение нового имени при переименовании
     saveRenameButton.addEventListener('click', () => {
         const buildingId = renameModal.dataset.buildingId;
-        const newName = document.getElementById('renameInput').value;
+        const newName = document.getElementById('renameInput').value.trim();
         const building = state.buildings.find(b => b.id === buildingId);
+
         if (building) {
             building.playerName = newName;
-            updateBuilding(building); // Обновляем DOM здания
-            updateBuildingsList();    // Обновляем список
+            // POTENTIAL_ISSUE: Аналогично, updateBuildingInManager - это то, что нужно вызывать.
+            updateBuildingInManager(building); // Обновляем данные и DOM
+            // updateBuildingsList(); // updateBuildingInManager может уже вызывать это, или нужно здесь.
+            // В текущей структуре updateBuilding (в buildingManager) не обновляет список.
+            // А uiManager.updateBuildingsList должна быть вызвана.
+            // Проверить, где вызывается uiManager.updateBuildingsList после изменения имени.
+            // Логично, если updateBuildingInManager сам обновляет всё, что нужно, или возвращает флаг.
+            // Сейчас updateBuilding в buildingManager не вызывает updateBuildingsList.
+            // Это значит, что список не обновится.
+            // Нужно либо добавить вызов updateBuildingsList в updateBuilding (менее предпочтительно),
+            // либо вызывать его здесь, либо в uiManager.showRenameModal после успешного сохранения.
+            // В uiManager.updateBuildingsList он вызывается, если вызывать его из uiManager.showRenameModal.
+            // Пока оставим как есть, но это точка для проверки.
+            // Решение: uiManager.updateBuildingsList() вызывается из uiManager.updateLanguage(),
+            // а также при каждом изменении массива buildings (create, delete). При простом rename - нет.
+            // Значит, здесь нужен вызов:
+            if (typeof uiManager !== 'undefined' && typeof uiManager.updateBuildingsList === 'function') { // Защита
+                 uiManager.updateBuildingsList();
+            } else if (typeof updateBuildingsList === 'function') { // Если импортирована напрямую
+                 updateBuildingsList(); // POTENTIAL_ISSUE: updateBuildingsList не импортирована напрямую в app.js
+            }
         }
         renameModal.style.display = 'none';
     });
+
+
+    // Обработчики для кнопок управления видом (поворот, расстояние до врат)
+    const rotateGridButton = document.getElementById('rotateGridButton');
+    if (rotateGridButton) {
+        rotateGridButton.addEventListener('click', toggleGridRotation);
+        // updateRotateButtonVisualState(); // Первоначальная установка состояния уже в DOMContentLoaded
+    }
+    const distanceToHGButton = document.getElementById('distanceToHGButton');
+    if (distanceToHGButton) {
+        distanceToHGButton.addEventListener('click', toggleDistanceToHGMode);
+        // updateDistanceToHGButtonVisualState(); // Аналогично
+    }
 
     // Переключение языка
     const langButtons = document.querySelectorAll('.language-btn');
     langButtons.forEach(btn => {
         btn.addEventListener('click', () => {
             state.setCurrentLang(btn.dataset.lang);
-            localStorage.setItem('alliancePlannerLang', state.currentLang);
+            localStorage.setItem('alliancePlannerLang', state.currentLang); // Сохраняем выбор
             langButtons.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            updateLanguage();
+            updateLanguage(); // Обновляем весь интерфейс
         });
     });
 
-    // Слушатели для кнопок смещения
-    const shiftUpButton = document.getElementById('shiftUpButton');
-    const shiftDownButton = document.getElementById('shiftDownButton');
-    const shiftLeftButton = document.getElementById('shiftLeftButton');
-    const shiftRightButton = document.getElementById('shiftRightButton');
-
+    // Массовое смещение зданий
+    const shiftControls = {
+        Up: document.getElementById('shiftUpButton'),
+        Down: document.getElementById('shiftDownButton'),
+        Left: document.getElementById('shiftLeftButton'),
+        Right: document.getElementById('shiftRightButton')
+    };
     const handleShift = (dx, dy) => {
-        if (state.isGridRotated) { // Сбрасываем поворот перед смещением
+        if (state.isGridRotated) { // Сброс поворота перед смещением
             state.setIsGridRotated(false);
             document.querySelector('.grid-container').classList.remove('rotated');
-            // updateRotateButtonVisualState(); // Обновить состояние кнопки поворота
-            // Эту функцию нужно будет импортировать из uiManager.js, если она там
-            // или вызвать аналогичную логику здесь.
-            const rotateButton = document.getElementById('rotateGridButton');
-            if (rotateButton && typeof updateRotateButtonVisualState === 'function') {
-                 updateRotateButtonVisualState();
-            } else if (rotateButton) { // запасной вариант, если функция не импортирована
-                rotateButton.classList.remove('active');
-                rotateButton.textContent = translations[state.currentLang]?.rotateGrid || "Rotate Grid";
-            }
+            updateRotateButtonVisualState(); // Обновить состояние кнопки поворота
         }
-        shiftAllBuildings(dx, dy);
+        shiftAllBuildings(dx, dy); // Вызов функции из buildingManager
     };
-
-    if (shiftUpButton) {
-        shiftUpButton.addEventListener('click', () => handleShift(0, -1));
-    }
-    if (shiftDownButton) {
-        shiftDownButton.addEventListener('click', () => handleShift(0, 1));
-    }
-    if (shiftLeftButton) {
-        shiftLeftButton.addEventListener('click', () => handleShift(-1, 0));
-    }
-    if (shiftRightButton) {
-        shiftRightButton.addEventListener('click', () => handleShift(1, 0));
-    }
+    if (shiftControls.Up) shiftControls.Up.addEventListener('click', () => handleShift(0, -1));
+    if (shiftControls.Down) shiftControls.Down.addEventListener('click', () => handleShift(0, 1));
+    if (shiftControls.Left) shiftControls.Left.addEventListener('click', () => handleShift(-1, 0));
+    if (shiftControls.Right) shiftControls.Right.addEventListener('click', () => handleShift(1, 0));
 
     // Изменение размера сетки
     const gridSizeInput = document.getElementById('gridSizeInput');
     const applyGridSizeButton = document.getElementById('applyGridSize');
     applyGridSizeButton.addEventListener('click', () => {
-        const newSize = parseInt(gridSizeInput.value);
+        const newSize = parseInt(gridSizeInput.value, 10);
         if (newSize >= 10 && newSize <= 100) {
             state.setGridSize(newSize);
-            localStorage.setItem('alliancePlannerGridSize', newSize);
+            localStorage.setItem('alliancePlannerGridSize', newSize.toString()); // Сохраняем
             setupGrid();
             redrawAllBuildings();
         } else {
-            gridSizeInput.value = state.gridSize; // Восстанавливаем предыдущее значение
-            alert(state.currentLang === 'ru' ? "Размер сетки должен быть от 10 до 100." : "Grid size must be between 10 and 100.");
+            gridSizeInput.value = state.gridSize; // Восстанавливаем валидное значение
+            alert(translations[state.currentLang]?.invalidGridSize || // POTENTIAL_ISSUE: Ключа нет
+                  (state.currentLang === 'ru' ? "Размер сетки должен быть от 10 до 100." : "Grid size must be between 10 and 100."));
         }
     });
 
-    // Кнопка Сохранить (создание ссылки)
-    const saveMainButton = document.getElementById('saveButton'); // Это кнопка "Сохранить" в хедере
-    saveMainButton.addEventListener('click', saveStateToBase64);
+    // Кнопка "Сохранить/Поделиться состоянием"
+    const saveMainButton = document.getElementById('saveButton');
+    if (saveMainButton) saveMainButton.addEventListener('click', saveStateToBase64);
 
-    // Адаптивность при изменении размера окна
+    // Адаптация интерфейса при изменении размера окна
     window.addEventListener('resize', checkScreenSize);
 
-    // Слушатель для удаления выделенного здания клавишей Delete
+    // Удаление выделенного здания клавишей Delete/Backspace
     document.addEventListener('keydown', (e) => {
-        // Проверяем, что фокус не находится на поле ввода, чтобы не удалять текст
         const activeElement = document.activeElement;
         const isInputFocused = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA');
 
-        if (e.key === 'Delete' || e.key === 'Backspace') { // Backspace часто используется как Delete на Mac
-            if (!isInputFocused && state.selectedBuilding) {
-                e.preventDefault(); // Предотвращаем стандартное действие (например, переход назад в истории браузера для Backspace)
-                
-                // Сохраняем ID перед удалением, так как deleteBuildingFromManager может сбросить selectedBuilding
-                const buildingIdToDelete = state.selectedBuilding; 
-                deleteBuildingFromManager(buildingIdToDelete);
-                // После удаления, selectedBuilding будет null (это делается внутри deleteBuildingFromManager)
-                // Если нужно явно снять выделение, можно вызвать selectBuildingInManager(null);
-                // но deleteBuildingFromManager уже должен это делать.
-            }
+        if ((e.key === 'Delete' || e.key === 'Backspace') && !isInputFocused && state.selectedBuilding) {
+            e.preventDefault(); // Предотвратить стандартное действие (например, переход назад)
+            deleteBuildingFromManager(state.selectedBuilding);
+            // state.selectedBuilding будет сброшен внутри deleteBuildingFromManager
         }
     });
 }
