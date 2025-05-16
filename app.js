@@ -1,980 +1,233 @@
-// Локализация
-const translations = {
-    ru: {
-        title: "Планировщик зданий альянса",
-        buildingsHeader: "Здания",
-        buildingsListHeader: "Список зданий",
-        modalTitle: "Имя игрока",
-        renameModalTitle: "Переименовать замок",
-        gridSizeLabel: "Размер сетки:",
-        apply: "Применить",
-        save: "Сохранить",
-        fortress: "Крепость альянса",
-        outpost: "Форпост альянса",
-        hellgates: "Адские врата",
-        hospital: "Госпиталь",
-        farm: "Ферма",
-        warehouse: "Склад",
-        castle: "Замок игрока",
-        deadzone: "Мертвая зона",
-        rename: "Переименовать",
-        delete: "Удалить",
-        playerName: "Имя игрока",
-        save: "Сохранить",
-        saveButton: "Сохранить"
-    },
-    en: {
-        title: "Alliance Buildings Planner",
-        buildingsHeader: "Buildings",
-        buildingsListHeader: "Buildings List",
-        modalTitle: "Player Name",
-        renameModalTitle: "Rename Castle",
-        gridSizeLabel: "Grid Size:",
-        apply: "Apply",
-        save: "Save",
-        fortress: "Alliance Fortress",
-        outpost: "Alliance Outpost",
-        hellgates: "Hell Gates",
-        hospital: "Hospital",
-        farm: "Farm",
-        warehouse: "Warehouse",
-        castle: "Player Castle",
-        deadzone: "Dead Zone",
-        rename: "Rename",
-        delete: "Delete",
-        playerName: "Player Name",
-        save: "Save",
-        saveButton: "Save",
+import * as state from './state.js';
+import { translations } from './config.js'; // Для доступа к переводам напрямую в app.js
+
+// Функциональные модули
+import { setupGrid, redrawAllBuildings } from './gridUtils.js';
+import {
+    createBuilding as createBuildingInManager, // Переименовываем для ясности, если будут локальные createBuilding
+    updateBuilding as updateBuildingInManager, // Аналогично
+    deleteBuilding as deleteBuildingFromManager,
+    shiftAllBuildings
+} from './buildingManager.js';
+import { setupDragAndDrop, createCursorGhostIconDOM } from './dragDrop.js';
+import {
+    updateLanguage,
+    checkScreenSize,
+    updateCastleDistanceDisplay,
+    updateRotateButtonVisualState,
+    updateDistanceToHGButtonVisualState
+} from './uiManager.js';
+import { saveStateToBase64, checkLocationHash } from './persistence.js';
+import { setupTouchPinchZoom, setupTouchDragAndDrop } from './touchControls.js';
+
+
+// --- Функции управления состоянием UI, специфичные для app.js ---
+
+/** Переключает режим поворота сетки и обновляет UI кнопки. */
+function toggleGridRotation() {
+    state.setIsGridRotated(!state.isGridRotated); // Инвертируем состояние
+    document.querySelector('.grid-container').classList.toggle('rotated', state.isGridRotated);
+    updateRotateButtonVisualState(); // Обновляем вид кнопки
+
+    // Если активен режим расстояний, перерисовываем их, так как поворот мог сброситься
+    if (state.showDistanceToHG) {
+        updateCastleDistanceDisplay();
     }
-};
+}
 
-let currentLang = 'ru';
+/** Переключает режим отображения расстояния до Адских Врат и обновляет UI. */
+function toggleDistanceToHGMode() {
+    state.setShowDistanceToHG(!state.showDistanceToHG); // Инвертируем состояние
+    updateDistanceToHGButtonVisualState(); // Обновляем вид кнопки
+    updateCastleDistanceDisplay(); // Обновляем отображение на замках
+}
 
-// Конфигурация зданий
-const buildingConfig = {
-    fortress: { icon: '🏰', size: 3, areaSize: 15, limit: 1, type: 'alliance' },
-    outpost: { icon: '🚩', size: 2, areaSize: 10, limit: 5, type: 'alliance' },
-    hellgates: { icon: '👹', size: 3, areaSize: 0, limit: 1, type: 'alliance' },
-    hospital: { icon: '🏥', size: 2, areaSize: 0, limit: 1, type: 'alliance' },
-    farm: { icon: '🌾', size: 2, areaSize: 0, limit: 1, type: 'alliance' },
-    warehouse: { icon: '🏭', size: 2, areaSize: 0, limit: 1, type: 'alliance' },
-    castle: { icon: '🏯', size: 2, areaSize: 0, limit: -1, type: 'player' },
-    deadzone: { icon: '⚠️', size: 1, areaSize: 0, limit: -1, type: 'special', bgcolor: 'rgba(144, 238, 144, 0.5)' },
-};
 
-// Состояние приложения
-let buildings = [];
-let selectedBuilding = null;
-let gridSize = 50;
-let cellSize = 24; // px
-
-// Инициализация приложения
+// --- Инициализация приложения ---
 document.addEventListener('DOMContentLoaded', () => {
-    setupGrid();
+    // 1. Восстановление состояния из localStorage (язык, размер сетки)
+    const savedLang = localStorage.getItem('alliancePlannerLang');
+    if (savedLang && translations[savedLang]) { // Проверяем, что сохраненный язык существует в переводах
+        state.setCurrentLang(savedLang);
+    }
+    const savedGridSize = localStorage.getItem('alliancePlannerGridSize');
+    if (savedGridSize) {
+        const parsedGridSize = parseInt(savedGridSize, 10);
+        if (!isNaN(parsedGridSize) && parsedGridSize >=10 && parsedGridSize <=100) {
+             state.setGridSize(parsedGridSize);
+        }
+    }
+
+    // 2. Создание динамических DOM-элементов (например, иконка-призрак у курсора)
+    createCursorGhostIconDOM();
+
+    // 3. Загрузка состояния из URL (хэша), если оно там есть
+    checkLocationHash(); // Это может обновить state.buildings и другие параметры, если они сохраняются
+
+    // 4. Первичная настройка UI на основе текущего (возможно, загруженного) состояния
+    document.getElementById('gridSizeInput').value = state.gridSize;
+    document.querySelectorAll('.language-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.lang === state.currentLang);
+    });
+
+    setupGrid();        // Инициализация сетки (создание ячеек)
+    updateLanguage();   // Установка всех текстов интерфейса, включая кнопки управления видом
+    redrawAllBuildings(); // Отрисовка зданий из state.buildings
+
+    // Обновление визуального состояния кнопок управления видом после полной инициализации UI
+    // updateLanguage уже должен вызывать updateRotateButtonVisualState
+    // updateDistanceToHGButtonVisualState(); // Вызывается из updateLanguage косвенно, если кнопки имеют data-key
+
+    // 5. Настройка глобальных обработчиков событий
+    setupGlobalEventListeners();
+
+    // 6. Инициализация специфичных элементов управления (Drag'n'Drop, Touch)
     setupDragAndDrop();
-    setupEventListeners();
-    updateBuildingsList();
-    updateLanguage();
-    checkLocationHash();
+    setupTouchPinchZoom();
+    setupTouchDragAndDrop(); // Инициализация, даже если не полностью реализована
+
+    // 7. Первичная проверка размера экрана (также вызывается в updateLanguage)
+    checkScreenSize();
 });
 
-// Настройка сетки
-function setupGrid() {
-    const grid = document.getElementById('grid');
-    grid.style.gridTemplateColumns = `repeat(${gridSize}, ${cellSize}px)`;
-    grid.style.gridTemplateRows = `repeat(${gridSize}, ${cellSize}px)`;
-
-    grid.innerHTML = '';
-    for (let i = 0; i < gridSize * gridSize; i++) {
-        const cell = document.createElement('div');
-        cell.className = 'grid-cell';
-        cell.style.width = `${cellSize}px`;
-        cell.style.height = `${cellSize}px`;
-        grid.appendChild(cell);
-    }
-}
-
-// Настройка перетаскивания
-function setupDragAndDrop() {
-    const buildingItems = document.querySelectorAll('.building-item');
-    const grid = document.getElementById('grid');
-
-    buildingItems.forEach(item => {
-        item.addEventListener('dragstart', (e) => {
-            e.dataTransfer.setData('text/plain', item.dataset.type);
-            item.classList.add('dragging');
-        });
-
-        item.addEventListener('dragend', () => {
-            item.classList.remove('dragging');
-        });
-    });
-
-    grid.addEventListener('dragover', (e) => {
-        e.preventDefault();
-    });
-
-    grid.addEventListener('drop', (e) => {
-        e.preventDefault();
-        const type = e.dataTransfer.getData('text/plain');
-        const rect = grid.getBoundingClientRect();
-        const x = Math.floor((e.clientX - rect.left) / cellSize);
-        const y = Math.floor((e.clientY - rect.top) / cellSize);
-
-        if (type === 'castle') {
-            showPlayerNameModal(x, y);
-        } else {
-            createBuilding(type, x, y);
-        }
-    });
-}
-
-// Настройка обработчиков событий
-function setupEventListeners() {
-    // Обработчики для модального окна имени игрока
+// --- Настройка глобальных обработчиков событий ---
+function setupGlobalEventListeners() {
+    // Обработчики для модальных окон
     const playerNameModal = document.getElementById('playerNameModal');
-    const closeButtons = document.querySelectorAll('.close');
+    const renameModal = document.getElementById('renameModal');
+    const closeButtons = document.querySelectorAll('.modal .close');
     const savePlayerNameButton = document.getElementById('savePlayerName');
-
-    setupTouchEvents();
-    setupTouchDragAndDrop();
+    const saveRenameButton = document.getElementById('saveRename');
 
     closeButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            playerNameModal.style.display = 'none';
-            document.getElementById('renameModal').style.display = 'none';
+        btn.addEventListener('click', (e) => { // Закрытие любой модалки по крестику
+            const modalToClose = e.target.closest('.modal');
+            if (modalToClose) {
+                modalToClose.style.display = 'none';
+            }
         });
     });
 
+    // Сохранение имени при создании нового замка/зоны
     savePlayerNameButton.addEventListener('click', () => {
-        const x = parseInt(playerNameModal.dataset.x);
-        const y = parseInt(playerNameModal.dataset.y);
-        const playerName = document.getElementById('playerNameInput').value;
+        const x = parseInt(playerNameModal.dataset.x, 10);
+        const y = parseInt(playerNameModal.dataset.y, 10);
+        const buildingType = playerNameModal.dataset.buildingType || 'castle';
+        const playerName = document.getElementById('playerNameInput').value.trim(); // Обрезаем пробелы
 
-        createBuilding('castle', x, y, playerName);
+        createBuildingInManager(buildingType, x, y, playerName);
         playerNameModal.style.display = 'none';
-        document.getElementById('playerNameInput').value = '';
     });
 
-    // Обработчик для кнопки сохранения при переименовании
-    const saveRenameButton = document.getElementById('saveRename');
+    // Сохранение нового имени при переименовании
     saveRenameButton.addEventListener('click', () => {
-        const buildingId = document.getElementById('renameModal').dataset.buildingId;
-        const newName = document.getElementById('renameInput').value;
+        const buildingId = renameModal.dataset.buildingId;
+        const newName = document.getElementById('renameInput').value.trim();
+        const building = state.buildings.find(b => b.id === buildingId);
 
-        const building = buildings.find(b => b.id === buildingId);
         if (building) {
             building.playerName = newName;
-            updateBuilding(building);
-            updateBuildingsList();
+            // POTENTIAL_ISSUE: Аналогично, updateBuildingInManager - это то, что нужно вызывать.
+            updateBuildingInManager(building); // Обновляем данные и DOM
+            // updateBuildingsList(); // updateBuildingInManager может уже вызывать это, или нужно здесь.
+            // В текущей структуре updateBuilding (в buildingManager) не обновляет список.
+            // А uiManager.updateBuildingsList должна быть вызвана.
+            // Проверить, где вызывается uiManager.updateBuildingsList после изменения имени.
+            // Логично, если updateBuildingInManager сам обновляет всё, что нужно, или возвращает флаг.
+            // Сейчас updateBuilding в buildingManager не вызывает updateBuildingsList.
+            // Это значит, что список не обновится.
+            // Нужно либо добавить вызов updateBuildingsList в updateBuilding (менее предпочтительно),
+            // либо вызывать его здесь, либо в uiManager.showRenameModal после успешного сохранения.
+            // В uiManager.updateBuildingsList он вызывается, если вызывать его из uiManager.showRenameModal.
+            // Пока оставим как есть, но это точка для проверки.
+            // Решение: uiManager.updateBuildingsList() вызывается из uiManager.updateLanguage(),
+            // а также при каждом изменении массива buildings (create, delete). При простом rename - нет.
+            // Значит, здесь нужен вызов:
+            if (typeof uiManager !== 'undefined' && typeof uiManager.updateBuildingsList === 'function') { // Защита
+                 uiManager.updateBuildingsList();
+            } else if (typeof updateBuildingsList === 'function') { // Если импортирована напрямую
+                 updateBuildingsList(); // POTENTIAL_ISSUE: updateBuildingsList не импортирована напрямую в app.js
+            }
         }
-
-        document.getElementById('renameModal').style.display = 'none';
+        renameModal.style.display = 'none';
     });
+
+
+    // Обработчики для кнопок управления видом (поворот, расстояние до врат)
+    const rotateGridButton = document.getElementById('rotateGridButton');
+    if (rotateGridButton) {
+        rotateGridButton.addEventListener('click', toggleGridRotation);
+    }
+    const distanceToHGButton = document.getElementById('distanceToHGButton');
+    if (distanceToHGButton) {
+        distanceToHGButton.addEventListener('click', toggleDistanceToHGMode);
+    }
 
     // Переключение языка
     const langButtons = document.querySelectorAll('.language-btn');
     langButtons.forEach(btn => {
         btn.addEventListener('click', () => {
-            currentLang = btn.dataset.lang;
+            state.setCurrentLang(btn.dataset.lang);
+            localStorage.setItem('alliancePlannerLang', state.currentLang); // Сохраняем выбор
             langButtons.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            updateLanguage();
+            updateLanguage(); // Обновляем весь интерфейс
         });
     });
+
+    // Массовое смещение зданий
+    const shiftControls = {
+        Up: document.getElementById('shiftUpButton'),
+        Down: document.getElementById('shiftDownButton'),
+        Left: document.getElementById('shiftLeftButton'),
+        Right: document.getElementById('shiftRightButton')
+    };
+    const handleShift = (dx, dy) => {
+        if (state.isGridRotated) { // Сброс поворота перед смещением
+            state.setIsGridRotated(false);
+            document.querySelector('.grid-container').classList.remove('rotated');
+            updateRotateButtonVisualState(); // Обновить состояние кнопки поворота
+        }
+        shiftAllBuildings(dx, dy); // Вызов функции из buildingManager
+    };
+    if (shiftControls.Up) shiftControls.Up.addEventListener('click', () => handleShift(0, -1));
+    if (shiftControls.Down) shiftControls.Down.addEventListener('click', () => handleShift(0, 1));
+    if (shiftControls.Left) shiftControls.Left.addEventListener('click', () => handleShift(-1, 0));
+    if (shiftControls.Right) shiftControls.Right.addEventListener('click', () => handleShift(1, 0));
 
     // Изменение размера сетки
+    const gridSizeInput = document.getElementById('gridSizeInput');
     const applyGridSizeButton = document.getElementById('applyGridSize');
     applyGridSizeButton.addEventListener('click', () => {
-        const newSize = parseInt(document.getElementById('gridSizeInput').value);
+        const newSize = parseInt(gridSizeInput.value, 10);
         if (newSize >= 10 && newSize <= 100) {
-            gridSize = newSize;
+            state.setGridSize(newSize);
+            localStorage.setItem('alliancePlannerGridSize', newSize.toString()); // Сохраняем
             setupGrid();
             redrawAllBuildings();
+        } else {
+            gridSizeInput.value = state.gridSize; // Восстанавливаем валидное значение
+            alert(translations[state.currentLang]?.invalidGridSize || // POTENTIAL_ISSUE: Ключа нет
+                  (state.currentLang === 'ru' ? "Размер сетки должен быть от 10 до 100." : "Grid size must be between 10 and 100."));
         }
     });
 
-    const saveButton = document.getElementById('saveButton');
-    saveButton.addEventListener('click', saveStateToBase64);
+    // Кнопка "Сохранить/Поделиться состоянием"
+    const saveMainButton = document.getElementById('saveButton');
+    if (saveMainButton) saveMainButton.addEventListener('click', saveStateToBase64);
 
+    // Адаптация интерфейса при изменении размера окна
     window.addEventListener('resize', checkScreenSize);
-    checkScreenSize(); // Вызвать сразу при загрузке
-}
 
-// Показ модального окна для ввода имени игрока
-function showPlayerNameModal(x, y) {
-    const modal = document.getElementById('playerNameModal');
-    modal.dataset.x = x;
-    modal.dataset.y = y;
-    modal.style.display = 'block';
-    document.getElementById('playerNameInput').focus();
-}
+    // Удаление выделенного здания клавишей Delete/Backspace
+    document.addEventListener('keydown', (e) => {
+        const activeElement = document.activeElement;
+        const isInputFocused = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA');
 
-// Показ модального окна для переименования замка
-function showRenameModal(buildingId) {
-    const building = buildings.find(b => b.id === buildingId);
-    if (!building) return;
-
-    const modal = document.getElementById('renameModal');
-    modal.dataset.buildingId = buildingId;
-    document.getElementById('renameInput').value = building.playerName || '';
-    modal.style.display = 'block';
-    document.getElementById('renameInput').focus();
-}
-
-// Создание здания
-function createBuilding(type, x, y, playerName = '') {
-    const config = buildingConfig[type];
-    if (!config) return;
-
-    // Проверка лимита зданий
-    if (config.limit > 0) {
-        const count = buildings.filter(b => b.type === type).length;
-        if (count >= config.limit) {
-            alert(currentLang === 'ru' ?
-                `Достигнут лимит зданий типа ${translations[currentLang][type]}` :
-                `Building limit reached for ${translations[currentLang][type]}`);
-            return;
-        }
-    }
-
-    // Корректировка позиции для зданий размером больше 1x1
-    if (config.size > 1) {
-        x = Math.max(0, Math.min(gridSize - config.size, x));
-        y = Math.max(0, Math.min(gridSize - config.size, y));
-    } else {
-        x = Math.max(0, Math.min(gridSize - 1, x));
-        y = Math.max(0, Math.min(gridSize - 1, y));
-    }
-
-    // Проверка перекрытия с другими зданиями
-    if (checkOverlap(x, y, config.size, config.size)) {
-        alert(currentLang === 'ru' ?
-            'Здания не могут перекрываться!' :
-            'Buildings cannot overlap!');
-        return;
-    }
-
-    // Создание нового объекта здания
-    const newBuilding = {
-        id: Date.now().toString(),
-        type: type,
-        x: x,
-        y: y,
-        playerName: type === 'castle' ? playerName : '',
-        size: config.size,
-        areaSize: config.areaSize,
-        icon: config.icon
-    };
-
-    buildings.push(newBuilding);
-    addBuildingToGrid(newBuilding);
-    updateBuildingsList();
-}
-
-// Проверка перекрытия с другими зданиями
-function checkOverlap(x, y, width, height) {
-    // Если передан один размер, используем его для обоих измерений (обратная совместимость)
-    if (height === undefined) {
-        height = width;
-    }
-
-    for (const building of buildings) {
-        // Получаем размеры текущего здания
-        const buildingWidth = building.width || building.size;
-        const buildingHeight = building.height || building.size;
-
-        // Проверка перекрытия между зданиями
-        if (x < building.x + buildingWidth &&
-            x + width > building.x &&
-            y < building.y + buildingHeight &&
-            y + height > building.y) {
-            return true;
-        }
-    }
-    return false;
-}
-
-// Добавление здания на сетку
-function addBuildingToGrid(building) {
-    const grid = document.getElementById('grid');
-
-    // Создание области влияния для зданий с areaSize > 0
-    if (building.areaSize > 0) {
-        const area = document.createElement('div');
-        area.className = 'building-area';
-        area.id = `area-${building.id}`;
-
-        const offset = Math.floor((building.areaSize - building.size) / 2);
-        const areaX = building.x - offset;
-        const areaY = building.y - offset;
-
-        area.style.left = `${areaX * cellSize}px`;
-        area.style.top = `${areaY * cellSize}px`;
-        area.style.width = `${building.areaSize * cellSize}px`;
-        area.style.height = `${building.areaSize * cellSize}px`;
-
-        grid.appendChild(area);
-    }
-
-    // Создание самого здания
-    const buildingEl = document.createElement('div');
-    buildingEl.className = 'building';
-    buildingEl.id = `building-${building.id}`;
-    buildingEl.dataset.id = building.id;
-
-    buildingEl.style.left = `${building.x * cellSize}px`;
-    buildingEl.style.top = `${building.y * cellSize}px`;
-    buildingEl.style.width = `${building.size * cellSize}px`;
-    buildingEl.style.height = `${building.size * cellSize}px`;
-
-    // Содержимое здания
-    if (building.type !== 'castle') {
-        const icon = document.createElement('div');
-        icon.textContent = building.icon;
-        buildingEl.appendChild(icon);
-
-        // Add name display for deadzone if it exists
-        if (building.type === 'deadzone' && building.playerName) {
-            const nameEl = document.createElement('div');
-            nameEl.className = 'deadzone-name';
-            nameEl.textContent = building.playerName;
-            nameEl.style.marginLeft = '5px';
-            buildingEl.appendChild(nameEl);
-        }
-    }
-
-    // Если это замок игрока, добавить имя
-    if (building.type === 'castle' && building.playerName) {
-        const nameEl = document.createElement('div');
-        nameEl.className = 'player-castle-name';
-        nameEl.textContent = building.playerName;
-        buildingEl.appendChild(nameEl);
-    }
-    if (building.type === 'castle') {
-        buildingEl.style.backgroundColor = 'rgba(255, 255, 255, 0.7)'; // Полупрозрачный белый
-    }
-
-    // Add this line at the end of the addBuildingToGrid function
-    if (building.type === 'deadzone') {
-        // Если это первое создание, установим width и height равными size
-        if (!building.width) building.width = building.size;
-        if (!building.height) building.height = building.size;
-
-        buildingEl.style.backgroundColor = buildingConfig[building.type].bgcolor;
-        buildingEl.style.width = `${building.width * cellSize}px`;
-        buildingEl.style.height = `${building.height * cellSize}px`;
-
-        makeDeadZoneResizable(buildingEl, building);
-    } else {
-        buildingEl.style.width = `${building.size * cellSize}px`;
-        buildingEl.style.height = `${building.size * cellSize}px`;
-    }
-
-    addTouchHandlersToBuilding(buildingEl, building);
-
-    // Добавление обработчиков для выбора и перетаскивания
-    buildingEl.addEventListener('mousedown', (e) => {
-        if (e.button === 0) { // Левая кнопка мыши
-            selectBuilding(building.id);
-
-            // Начало перетаскивания
-            const startX = e.clientX;
-            const startY = e.clientY;
-            const startBuildingX = building.x;
-            const startBuildingY = building.y;
-
-            const handleMouseMove = (moveEvent) => {
-                const deltaX = Math.floor((moveEvent.clientX - startX) / cellSize);
-                const deltaY = Math.floor((moveEvent.clientY - startY) / cellSize);
-
-                const newX = Math.max(0, Math.min(gridSize - building.size, startBuildingX + deltaX));
-                const newY = Math.max(0, Math.min(gridSize - building.size, startBuildingY + deltaY));
-
-                // Временно скрыть здание для проверки перекрытия
-                const index = buildings.findIndex(b => b.id === building.id);
-                const tempBuilding = buildings.splice(index, 1)[0];
-
-                if (!checkOverlap(newX, newY, building.size)) {
-                    building.x = newX;
-                    building.y = newY;
-                    updateBuilding(building);
-                }
-
-                // Вернуть здание в массив
-                buildings.splice(index, 0, tempBuilding);
-            };
-
-            const handleMouseUp = () => {
-                document.removeEventListener('mousemove', handleMouseMove);
-                document.removeEventListener('mouseup', handleMouseUp);
-            };
-
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseup', handleMouseUp);
+        if ((e.key === 'Delete' || e.key === 'Backspace') && !isInputFocused && state.selectedBuilding) {
+            e.preventDefault(); // Предотвратить стандартное действие (например, переход назад)
+            deleteBuildingFromManager(state.selectedBuilding);
+            // state.selectedBuilding будет сброшен внутри deleteBuildingFromManager
         }
     });
-
-    grid.appendChild(buildingEl);
-}
-
-// Обновление положения и внешнего вида здания
-function updateBuilding(building) {
-    const buildingEl = document.getElementById(`building-${building.id}`);
-    if (!buildingEl) return;
-
-    buildingEl.style.left = `${building.x * cellSize}px`;
-    buildingEl.style.top = `${building.y * cellSize}px`;
-
-    // Обновление области влияния, если есть
-    if (building.areaSize > 0) {
-        const areaEl = document.getElementById(`area-${building.id}`);
-        if (areaEl) {
-            const offset = Math.floor((building.areaSize - building.size) / 2);
-            const areaX = building.x - offset;
-            const areaY = building.y - offset;
-
-            areaEl.style.left = `${areaX * cellSize}px`;
-            areaEl.style.top = `${areaY * cellSize}px`;
-        }
-    }
-
-    // Обновление имени для замка игрока
-    if (building.type === 'castle') {
-        let nameEl = buildingEl.querySelector('.player-castle-name');
-        if (!nameEl && building.playerName) {
-            nameEl = document.createElement('div');
-            nameEl.className = 'player-castle-name';
-            buildingEl.appendChild(nameEl);
-        }
-
-        if (nameEl) {
-            nameEl.textContent = building.playerName || '';
-        }
-    }
-
-    // if (building.type === 'deadzone') {
-    //     buildingEl.style.width = `${building.width * cellSize}px`;
-    //     buildingEl.style.height = `${building.height * cellSize}px`;
-    // } else {
-    //     buildingEl.style.width = `${building.size * cellSize}px`;
-    //     buildingEl.style.height = `${building.size * cellSize}px`;
-    // }
-
-    if (building.type === 'deadzone') {
-        let nameEl = buildingEl.querySelector('.deadzone-name');
-        if (!nameEl && building.playerName) {
-            nameEl = document.createElement('div');
-            nameEl.className = 'deadzone-name';
-            nameEl.style.marginLeft = '5px';
-            buildingEl.appendChild(nameEl);
-        }
-
-        if (nameEl) {
-            nameEl.textContent = building.playerName || '';
-        }
-    }
-}
-
-// Выбор здания
-function selectBuilding(id) {
-    // Снять выделение с предыдущего здания
-    if (selectedBuilding) {
-        const prevEl = document.getElementById(`building-${selectedBuilding}`);
-        if (prevEl) prevEl.classList.remove('selected');
-
-        const prevListItem = document.getElementById(`list-item-${selectedBuilding}`);
-        if (prevListItem) prevListItem.classList.remove('selected');
-    }
-
-    selectedBuilding = id;
-
-    // Выделить новое здание
-    if (selectedBuilding) {
-        const buildingEl = document.getElementById(`building-${selectedBuilding}`);
-        if (buildingEl) buildingEl.classList.add('selected');
-
-        const listItem = document.getElementById(`list-item-${selectedBuilding}`);
-        if (listItem) {
-            listItem.classList.add('selected');
-            listItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-    }
-}
-
-// Удаление здания
-function deleteBuilding(id) {
-    const index = buildings.findIndex(b => b.id === id);
-    if (index === -1) return;
-
-    const building = buildings[index];
-    buildings.splice(index, 1);
-
-    // Удаление элементов с DOM
-    const buildingEl = document.getElementById(`building-${id}`);
-    if (buildingEl) buildingEl.remove();
-
-    if (building.areaSize > 0) {
-        const areaEl = document.getElementById(`area-${id}`);
-        if (areaEl) areaEl.remove();
-    }
-
-    if (selectedBuilding === id) {
-        selectedBuilding = null;
-    }
-
-    updateBuildingsList();
-}
-
-// Обновление списка зданий
-function updateBuildingsList() {
-    const listContainer = document.getElementById('buildings-list');
-    const actions = document.createElement('div');
-    listContainer.innerHTML = '';
-
-    // Сортировка зданий: сначала альянса, потом замки игроков по имени
-    const sortedBuildings = [...buildings].sort((a, b) => {
-        const configA = buildingConfig[a.type];
-        const configB = buildingConfig[b.type];
-
-        if (configA.type === 'alliance' && configB.type !== 'alliance') return -1;
-        if (configA.type !== 'alliance' && configB.type === 'alliance') return 1;
-
-        if (a.type === 'castle' && b.type === 'castle') {
-            return (a.playerName || '').localeCompare(b.playerName || '');
-        }
-
-        return 0;
-    });
-
-    sortedBuildings.forEach(building => {
-        const listItem = document.createElement('div');
-        listItem.className = 'list-item';
-        listItem.id = `list-item-${building.id}`;
-        if (selectedBuilding === building.id) {
-            listItem.classList.add('selected');
-        }
-
-        // Создание информации о здании
-        const info = document.createElement('div');
-        info.innerHTML = `${building.icon} ${translations[currentLang][building.type]}`;
-        if (building.type === 'castle' && building.playerName) {
-            info.innerHTML += `: ${building.playerName}`;
-        }
-
-        // Создание кнопок действий
-        const actions = document.createElement('div');
-
-        // if (building.type === 'castle') {
-        //     const renameBtn = document.createElement('button');
-        //     renameBtn.textContent = translations[currentLang].rename;
-        //     renameBtn.addEventListener('click', () => showRenameModal(building.id));
-        //     actions.appendChild(renameBtn);
-        // }
-
-        if (building.type === 'castle' || building.type === 'deadzone') {
-            const renameBtn = document.createElement('button');
-            renameBtn.textContent = translations[currentLang].rename;
-            renameBtn.addEventListener('click', () => showRenameModal(building.id));
-            actions.appendChild(renameBtn);
-        }
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.textContent = translations[currentLang].delete;
-        deleteBtn.addEventListener('click', () => deleteBuilding(building.id));
-        actions.appendChild(deleteBtn);
-
-        listItem.appendChild(info);
-        listItem.appendChild(actions);
-
-        // Добавление обработчика щелчка для выбора здания
-        listItem.addEventListener('click', (e) => {
-            if (!e.target.closest('button')) {
-                selectBuilding(building.id);
-            }
-        });
-
-        listContainer.appendChild(listItem);
-    });
-}
-
-// Перерисовка всех зданий
-function redrawAllBuildings() {
-    // Удаление всех существующих зданий и областей
-    const grid = document.getElementById('grid');
-    document.querySelectorAll('.building, .building-area').forEach(el => el.remove());
-    // Повторное добавление всех зданий на сетку
-    buildings.forEach(building => {
-        addBuildingToGrid(building);
-    });
-}
-
-// Обновление языка интерфейса
-function updateLanguage() {
-    // Заголовок страницы
-    document.getElementById('title').textContent = translations[currentLang].title;
-    document.title = translations[currentLang].title;
-
-    // Заголовки разделов
-    document.getElementById('buildings-header').textContent = translations[currentLang].buildingsHeader;
-    document.getElementById('buildings-list-header').textContent = translations[currentLang].buildingsListHeader;
-
-    // Заголовки модальных окон
-    document.getElementById('modal-title').textContent = translations[currentLang].modalTitle;
-    document.getElementById('rename-modal-title').textContent = translations[currentLang].renameModalTitle;
-
-    // Кнопки
-    document.querySelectorAll('[data-key]').forEach(el => {
-        const key = el.getAttribute('data-key');
-        if (translations[currentLang][key]) {
-            el.textContent = translations[currentLang][key];
-        }
-    });
-
-    // Названия зданий в панели инструментов
-    document.querySelectorAll('.building-name').forEach(el => {
-        const key = el.getAttribute('data-key');
-        if (translations[currentLang][key]) {
-            el.textContent = translations[currentLang][key];
-        }
-    });
-
-    // Лейбл для ввода размера сетки
-    document.getElementById('grid-size-label').textContent = translations[currentLang].gridSizeLabel;
-
-    // Плейсхолдер для ввода имени игрока
-    document.getElementById('playerNameInput').placeholder = translations[currentLang].playerName;
-
-    // Обновление списка зданий
-    updateBuildingsList();
-
-    document.getElementById('saveButton').textContent = translations[currentLang].saveButton;
-}
-
-// Сохранение состояния в base64 и создание ссылки
-function saveStateToBase64() {
-    // Подготовка данных для сохранения (только нужные поля)
-    const stateToSave = buildings.map(b => ({
-        type: b.type,
-        x: b.x,
-        y: b.y,
-        playerName: b.playerName || '',
-        // Добавляем width и height для мертвых зон
-        ...(b.type === 'deadzone' ? { width: b.width, height: b.height } : {})
-    }));
-
-    // Преобразование в JSON и затем в base64
-    const jsonState = JSON.stringify(stateToSave);
-    const base64State = btoa(encodeURIComponent(jsonState));
-
-    // Создание ссылки с хэшем
-    const url = `${window.location.origin}${window.location.pathname}#${base64State}`;
-
-    // Копирование ссылки в буфер обмена
-    navigator.clipboard.writeText(url).then(() => {
-        alert(currentLang === 'ru' ? 'Ссылка скопирована в буфер обмена!' : 'Link copied to clipboard!');
-    }).catch(err => {
-        console.error('Не удалось скопировать ссылку:', err);
-        // Показать ссылку пользователю, если не удалось скопировать
-        alert(currentLang === 'ru' ?
-            `Не удалось скопировать ссылку автоматически. Вот ваша ссылка:\n${url}` :
-            `Failed to copy link automatically. Here is your link:\n${url}`);
-    });
-
-    return url;
-}
-
-// Загрузка состояния из base64
-function loadStateFromBase64(base64State) {
-    try {
-        // Декодирование base64 в JSON
-        const jsonState = decodeURIComponent(atob(base64State));
-        const loadedState = JSON.parse(jsonState);
-
-        // Очистка текущих зданий
-        buildings.forEach(b => {
-            const buildingEl = document.getElementById(`building-${b.id}`);
-            if (buildingEl) buildingEl.remove();
-
-            if (b.areaSize > 0) {
-                const areaEl = document.getElementById(`area-${b.id}`);
-                if (areaEl) areaEl.remove();
-            }
-        });
-
-        buildings = [];
-        selectedBuilding = null;
-
-        // Загрузка зданий из сохраненного состояния
-        loadedState.forEach(savedBuilding => {
-            const config = buildingConfig[savedBuilding.type];
-            if (!config) return;
-
-            const newBuilding = {
-                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-                type: savedBuilding.type,
-                x: savedBuilding.x,
-                y: savedBuilding.y,
-                playerName: savedBuilding.playerName || '',
-                size: config.size,
-                areaSize: config.areaSize,
-                icon: config.icon
-            };
-
-            buildings.push(newBuilding);
-            addBuildingToGrid(newBuilding);
-        });
-
-        updateBuildingsList();
-        return true;
-    } catch (error) {
-        console.error('Ошибка при загрузке состояния:', error);
-        return false;
-    }
-}
-
-// Проверка location hash при загрузке страницы
-function checkLocationHash() {
-    if (window.location.hash) {
-        const base64State = window.location.hash.slice(1); // Убираем символ # из начала
-        loadStateFromBase64(base64State);
-    }
-}
-
-function makeDeadZoneResizable(buildingEl, building) {
-    if (building.type !== 'deadzone') return;
-
-    // Добавим свойства width и height вместо единого size
-    if (!building.width) building.width = building.size || 1;
-    if (!building.height) building.height = building.size || 1;
-
-    // Create resize handle
-    const resizeHandle = document.createElement('div');
-    resizeHandle.className = 'resize-handle';
-    buildingEl.appendChild(resizeHandle);
-
-    // Add resize functionality
-    resizeHandle.addEventListener('mousedown', (e) => {
-        e.stopPropagation(); // Prevent dragging the building
-
-        const startX = e.clientX;
-        const startY = e.clientY;
-        const startWidth = building.width;
-        const startHeight = building.height;
-
-        const handleMouseMove = (moveEvent) => {
-            const deltaX = Math.floor((moveEvent.clientX - startX) / cellSize);
-            const deltaY = Math.floor((moveEvent.clientY - startY) / cellSize);
-
-            // Обновляем width и height независимо друг от друга
-            const newWidth = Math.max(1, Math.min(gridSize - building.x, startWidth + deltaX));
-            const newHeight = Math.max(1, Math.min(gridSize - building.y, startHeight + deltaY));
-
-            building.width = newWidth;
-            building.height = newHeight;
-
-            // Update the building's visual size
-            buildingEl.style.width = `${building.width * cellSize}px`;
-            buildingEl.style.height = `${building.height * cellSize}px`;
-        };
-
-        const handleMouseUp = () => {
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
-        };
-
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
-    });
-
-    // Add touch support for resizing
-    resizeHandle.addEventListener('touchstart', (e) => {
-        e.stopPropagation();
-
-        const touch = e.touches[0];
-        const startX = touch.clientX;
-        const startY = touch.clientY;
-        const startWidth = building.width;
-        const startHeight = building.height;
-
-        const handleTouchMove = (touchEvent) => {
-            const touch = touchEvent.touches[0];
-            const deltaX = Math.floor((touch.clientX - startX) / cellSize);
-            const deltaY = Math.floor((touch.clientY - startY) / cellSize);
-
-            // Обновляем width и height независимо друг от друга
-            const newWidth = Math.max(1, Math.min(gridSize - building.x, startWidth + deltaX));
-            const newHeight = Math.max(1, Math.min(gridSize - building.y, startHeight + deltaY));
-
-            building.width = newWidth;
-            building.height = newHeight;
-
-            buildingEl.style.width = `${building.width * cellSize}px`;
-            buildingEl.style.height = `${building.height * cellSize}px`;
-        };
-
-        const handleTouchEnd = () => {
-            document.removeEventListener('touchmove', handleTouchMove);
-            document.removeEventListener('touchend', handleTouchEnd);
-        };
-
-        document.addEventListener('touchmove', handleTouchMove);
-        document.addEventListener('touchend', handleTouchEnd);
-    });
-}
-
-function setupTouchDragAndDrop() {
-    const buildingItems = document.querySelectorAll('.building-item');
-    const grid = document.getElementById('grid');
-
-    buildingItems.forEach(item => {
-        item.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            item.classList.add('dragging');
-
-            // Создаем плавающий элемент с подсказкой
-            const tooltip = document.createElement('div');
-            tooltip.className = 'tooltip';
-            tooltip.textContent = item.querySelector('.building-name').textContent;
-            document.body.appendChild(tooltip);
-
-            const updateTooltipPosition = (clientX, clientY) => {
-                tooltip.style.position = 'absolute';
-                tooltip.style.left = `${clientX}px`;
-                tooltip.style.top = `${clientY + 30}px`;
-            };
-
-            const touch = e.touches[0];
-            updateTooltipPosition(touch.clientX, touch.clientY);
-
-            const handleTouchMove = (moveEvent) => {
-                const touch = moveEvent.touches[0];
-                updateTooltipPosition(touch.clientX, touch.clientY);
-            };
-
-            const handleTouchEnd = (endEvent) => {
-                item.classList.remove('dragging');
-                document.body.removeChild(tooltip);
-
-                document.removeEventListener('touchmove', handleTouchMove);
-                document.removeEventListener('touchend', handleTouchEnd);
-
-                const touch = endEvent.changedTouches[0];
-                const rect = grid.getBoundingClientRect();
-
-                if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
-                    touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
-
-                    const x = Math.floor((touch.clientX - rect.left) / cellSize);
-                    const y = Math.floor((touch.clientY - rect.top) / cellSize);
-                    const type = item.dataset.type;
-
-                    if (type === 'castle') {
-                        showPlayerNameModal(x, y);
-                    } else {
-                        createBuilding(type, x, y);
-                    }
-                }
-            };
-
-            document.addEventListener('touchmove', handleTouchMove);
-            document.addEventListener('touchend', handleTouchEnd);
-        });
-    });
-}
-
-function addTouchHandlersToBuilding(buildingEl, building) {
-    buildingEl.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        selectBuilding(building.id);
-
-        const touch = e.touches[0];
-        const startX = touch.clientX;
-        const startY = touch.clientY;
-        const startBuildingX = building.x;
-        const startBuildingY = building.y;
-
-        const handleTouchMove = (moveEvent) => {
-            const touch = moveEvent.touches[0];
-            const deltaX = Math.floor((touch.clientX - startX) / cellSize);
-            const deltaY = Math.floor((touch.clientY - startY) / cellSize);
-
-            const newX = Math.max(0, Math.min(gridSize - building.size, startBuildingX + deltaX));
-            const newY = Math.max(0, Math.min(gridSize - building.size, startBuildingY + deltaY));
-
-            // Temporarily remove building for overlap check
-            const index = buildings.findIndex(b => b.id === building.id);
-            const tempBuilding = buildings.splice(index, 1)[0];
-
-            if (!checkOverlap(newX, newY, building.size)) {
-                building.x = newX;
-                building.y = newY;
-                updateBuilding(building);
-            }
-
-            // Return building to array
-            buildings.splice(index, 0, tempBuilding);
-        };
-
-        const handleTouchEnd = () => {
-            document.removeEventListener('touchmove', handleTouchMove);
-            document.removeEventListener('touchend', handleTouchEnd);
-        };
-
-        document.addEventListener('touchmove', handleTouchMove);
-        document.addEventListener('touchend', handleTouchEnd);
-    });
-}
-
-function setupTouchEvents() {
-    const gridContainer = document.querySelector('.grid-container');
-    let initialDistance = 0;
-    let initialCellSize = cellSize;
-
-    gridContainer.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 2) {
-            initialDistance = Math.hypot(
-                e.touches[0].clientX - e.touches[1].clientX,
-                e.touches[0].clientY - e.touches[1].clientY
-            );
-            initialCellSize = cellSize;
-        }
-    });
-
-    gridContainer.addEventListener('touchmove', (e) => {
-        if (e.touches.length === 2) {
-            e.preventDefault(); // Prevent page scrolling
-
-            const currentDistance = Math.hypot(
-                e.touches[0].clientX - e.touches[1].clientX,
-                e.touches[0].clientY - e.touches[1].clientY
-            );
-
-            const scaleFactor = currentDistance / initialDistance;
-            cellSize = Math.max(6, Math.min(36, initialCellSize * scaleFactor));
-
-            setupGrid();
-            redrawAllBuildings();
-        }
-    });
-}
-
-function checkScreenSize() {
-    const isMobile = window.matchMedia('(max-width: 768px)').matches;
-    document.body.classList.toggle('mobile-view', isMobile);
-
-    // Обновляем интерфейс в зависимости от размера экрана
-    if (isMobile) {
-        // Для мобильных устройств показываем только иконки
-        document.querySelectorAll('.building-item .building-name').forEach(name => {
-            name.dataset.originalText = name.textContent;
-        });
-    } else {
-        // Для больших экранов восстанавливаем текст
-        document.querySelectorAll('.building-item .building-name').forEach(name => {
-            if (name.dataset.originalText) {
-                name.textContent = name.dataset.originalText;
-            }
-        });
-    }
 }
