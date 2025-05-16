@@ -143,10 +143,6 @@ header h1 {
     font-size: 24px;
 }
 
-.building-item .building-name {
-    /* Стили для имени здания в тулбаре, если нужны */
-}
-
 /* Состояния перетаскивания для элемента из тулбара */
 .building-item.dragging {
     cursor: grabbing;
@@ -474,9 +470,3 @@ header h1 {
         margin: 20% auto;
     }
 }
-
-/* POTENTIAL_ISSUE: Стиль .tooltip не используется в предоставленном JS. Если он нужен, его стоит оставить. */
-/* .tooltip { ... } */
-
-/* POTENTIAL_ISSUE: Стиль .config-panel не используется в HTML и JS. Если он не нужен, его можно удалить. */
-/* .config-panel { ... } */

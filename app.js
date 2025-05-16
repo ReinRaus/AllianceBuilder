@@ -12,8 +12,6 @@ import {
 import { setupDragAndDrop, createCursorGhostIconDOM } from './dragDrop.js';
 import {
     updateLanguage,
-    // showPlayerNameModal, // Не используется напрямую в app.js после рефакторинга
-    // showRenameModal,   // Аналогично
     checkScreenSize,
     updateCastleDistanceDisplay,
     updateRotateButtonVisualState,
@@ -117,10 +115,6 @@ function setupGlobalEventListeners() {
         const buildingType = playerNameModal.dataset.buildingType || 'castle';
         const playerName = document.getElementById('playerNameInput').value.trim(); // Обрезаем пробелы
 
-        // POTENTIAL_ISSUE: createBuildingInManager импортирован, но здесь вызывается createBuilding.
-        // Нужно убедиться, что это правильный вызов. Если createBuilding - это createBuildingInManager,
-        // то все ок. Если createBuilding - это нечто другое, то ошибка.
-        // Судя по импортам, createBuildingInManager - это то, что нужно.
         createBuildingInManager(buildingType, x, y, playerName);
         playerNameModal.style.display = 'none';
     });
@@ -163,12 +157,10 @@ function setupGlobalEventListeners() {
     const rotateGridButton = document.getElementById('rotateGridButton');
     if (rotateGridButton) {
         rotateGridButton.addEventListener('click', toggleGridRotation);
-        // updateRotateButtonVisualState(); // Первоначальная установка состояния уже в DOMContentLoaded
     }
     const distanceToHGButton = document.getElementById('distanceToHGButton');
     if (distanceToHGButton) {
         distanceToHGButton.addEventListener('click', toggleDistanceToHGMode);
-        // updateDistanceToHGButtonVisualState(); // Аналогично
     }
 
     // Переключение языка
