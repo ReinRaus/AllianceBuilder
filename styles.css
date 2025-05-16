@@ -57,7 +57,17 @@ header {
 }
 
 .building-item.dragging {
-    opacity: 0.5;
+    cursor: grabbing;
+}
+
+.building-item.dragging-source-transparent {
+    opacity: 0.1 !important; /* Прозрачность для оригинального элемента в панели на время перетаскивания */
+                             /* Можете выбрать другое значение, например 0.5 */
+}
+
+.building-item.dragging-over-grid {
+    opacity: 0; /* Или opacity: 0; для полного исчезновения */
+    transition: opacity 0.1s ease-out; /* Плавный переход */
 }
 
 .grid {
@@ -310,4 +320,33 @@ header-buttons {
         white-space: nowrap;
         z-index: 100;
     }
+}
+
+.ghost-building {
+    opacity: 0.7;
+    border-style: dashed;
+    pointer-events: none;
+}
+
+/* Новый стиль для иконки-призрака, следующей за курсором */
+#cursor-ghost-icon {
+    position: fixed; /* Или absolute, если родитель body */
+    pointer-events: none; /* Чтобы не мешала другим событиям */
+    z-index: 2000; /* Выше всего остального */
+    font-size: 28px; /* Размер иконки, как в тулбаре или чуть больше */
+    /* Можно добавить небольшой фон или тень для лучшей видимости */
+    background-color: rgba(255, 255, 255, 0.7);
+    padding: 2px 5px;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.ghost-area {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.invalid-position {
+    border-color: red;
+    background-color: rgba(255, 0, 0, 0.2);
 }
