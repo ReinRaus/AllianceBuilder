@@ -20,7 +20,13 @@ export const translations = {
         rename: "Переименовать",
         delete: "Удалить",
         playerName: "Имя игрока",
-        saveButton: "Сохранить" // Кнопка для шаринга состояния
+        saveButton: "Сохранить", // Кнопка для шаринга состояния
+        rotateGrid: "Повернуть сетку",
+        resetRotation: "Сбросить поворот",
+        distanceToHGLabel: "До Адских Врат", // Текст для кнопки
+        distanceUnit: "", // Единица измерения расстояния (клеток)
+        hellgatesNotPlaced: "Врата не установлены",
+        cannotShiftFurther: "Невозможно сдвинуть здания дальше.",
     },
     en: {
         title: "Alliance Buildings Planner",
@@ -43,7 +49,71 @@ export const translations = {
         delete: "Delete",
         playerName: "Player Name",
         saveButton: "Save", // Button for sharing state
-    }
+        rotateGrid: "Rotate Grid",
+        resetRotation: "Reset Rotation",
+        distanceToHGLabel: "To Hell Gates", // Text for the button
+        distanceUnit: "cells", // Distance unit
+        hellgatesNotPlaced: "Gates not placed",
+        cannotShiftFurther: "Cannot shift buildings further.",
+    },
+    pt_br: { // Португальский (Бразилия)
+        title: "Planejador de Construções da Aliança",
+        buildingsHeader: "Construções",
+        buildingsListHeader: "Lista de Construções",
+        modalTitle: "Nome do Jogador",
+        renameModalTitle: "Renomear Castelo",
+        gridSizeLabel: "Tamanho da Grade:",
+        apply: "Aplicar",
+        save: "Salvar",
+        fortress: "Fortaleza da Aliança",
+        outpost: "Posto Avançado da Aliança",
+        hellgates: "Portões Infernais",
+        hospital: "Hospital",
+        farm: "Fazenda",
+        warehouse: "Armazém",
+        castle: "Castelo do Jogador",
+        deadzone: "Zona Morta",
+        rename: "Renomear",
+        delete: "Excluir",
+        playerName: "Nome do Jogador",
+        saveButton: "Salvar", // Для кнопки "поделиться состоянием"
+        defaultCastleNamePrefix: "Castelo ",
+        rotateGrid: "Girar Grade",
+        resetRotation: "Resetar Rotação",
+        distanceToHGLabel: "Aos Portões Infernais",
+        distanceUnit: "células",
+        hellgatesNotPlaced: "Portões não colocados",
+        cannotShiftFurther: "Não é possível mover mais as construções."
+    },
+    de: { // Немецкий
+        title: "Allianz Gebäudeplaner",
+        buildingsHeader: "Gebäude",
+        buildingsListHeader: "Gebäudeliste",
+        modalTitle: "Spielername",
+        renameModalTitle: "Burg umbenennen",
+        gridSizeLabel: "Rastergröße:",
+        apply: "Anwenden",
+        save: "Speichern",
+        fortress: "Allianzfestung",
+        outpost: "Außenposten der Allianz",
+        hellgates: "Höllentore",
+        hospital: "Krankenhaus",
+        farm: "Farm",
+        warehouse: "Lagerhaus",
+        castle: "Spielerburg",
+        deadzone: "Todeszone",
+        rename: "Umbenennen",
+        delete: "Löschen",
+        playerName: "Spielername",
+        saveButton: "Speichern", // Для кнопки "поделиться состоянием"
+        defaultCastleNamePrefix: "Burg ",
+        rotateGrid: "Raster drehen",
+        resetRotation: "Drehung zurücksetzen",
+        distanceToHGLabel: "Zu den Höllentoren",
+        distanceUnit: "Felder",
+        hellgatesNotPlaced: "Tore nicht platziert",
+        cannotShiftFurther: "Gebäude können nicht weiter verschoben werden."
+    },
 };
 
 // Конфигурация зданий

@@ -135,8 +135,89 @@ export function updateLanguage() {
     // document.getElementById('playerNameInput').placeholder = translations[state.currentLang].playerName; // Уже обработано через data-key
     document.getElementById('saveButton').textContent = translations[state.currentLang].saveButton;
 
+    // Обновление текста кнопки поворота
+    const rotateButton = document.getElementById('rotateGridButton');
+    if (rotateButton) {
+        const key = state.isGridRotated ? 'resetRotation' : 'rotateGrid';
+        rotateButton.textContent = translations[state.currentLang][key] || key;
+    }
+    
+    // Обновление текста кнопки "До адских врат" (если data-key используется)
+    // она уже должна обновляться через querySelectorAll('[data-key]')
+
+    // Если режим расстояний активен, обновить отображение с новым языком
+    if (state.showDistanceToHG) {
+        // Нужен доступ к updateCastleDistanceDisplay.
+        // Либо передать как колбэк, либо импортировать из app.js (что создаст цикл).
+        // Проще всего, если updateCastleDistanceDisplay будет сама знать о currentLang.
+        // Она уже использует translations[state.currentLang], так что это ок.
+        // Просто вызовем её из app.js после updateLanguage если режим активен.
+        // Или, как вариант, updateCastleDistanceDisplay может быть в uiManager.js
+        // Но она сильно завязана на логику зданий.
+        // Пока оставим вызов из app.js или при toggleDistanceToHGMode.
+    }
+
     updateBuildingsList(); // Перерисовать список с новыми названиями
     checkScreenSize(); // Применить правила для мобильной версии (скрыть/показать текст)
+}
+
+export function updateCastleDistanceDisplay() {
+    const hellGates = state.buildings.find(b => b.type === 'hellgates');
+
+    state.buildings.forEach(building => {
+        if (building.type === 'castle') {
+            const buildingEl = document.getElementById(`building-${building.id}`);
+            if (!buildingEl) return;
+
+            let nameEl = buildingEl.querySelector('.player-castle-name');
+            if (!nameEl) {
+                nameEl = document.createElement('div');
+                nameEl.className = 'player-castle-name';
+                const iconEl = buildingEl.querySelector('.icon'); // Иконка замка обычно не показывается, но на всякий случай
+                if (iconEl) {
+                    iconEl.insertAdjacentElement('afterend', nameEl);
+                } else {
+                    buildingEl.appendChild(nameEl);
+                }
+            }
+
+            if (state.showDistanceToHG) {
+                if (hellGates) {
+                    const castleCenterX = building.x + building.size / 2;
+                    const castleCenterY = building.y + building.size / 2;
+                    const hgCenterX = hellGates.x + hellGates.size / 2;
+                    const hgCenterY = hellGates.y + hellGates.size / 2;
+
+                    const distance = Math.sqrt(
+                        Math.pow(castleCenterX - hgCenterX, 2) +
+                        Math.pow(castleCenterY - hgCenterY, 2)
+                    );
+                    nameEl.textContent = `${distance.toFixed(1)} ${translations[state.currentLang].distanceUnit}`;
+                } else {
+                    nameEl.textContent = translations[state.currentLang].hellgatesNotPlaced;
+                }
+            } else {
+                nameEl.textContent = building.playerName || '';
+            }
+        }
+        // Можно добавить логику для других зданий, если потребуется
+    });
+}
+
+export function updateRotateButtonVisualState() { // Только визуальное состояние
+    const rotateButton = document.getElementById('rotateGridButton');
+    if (rotateButton) {
+        const key = state.isGridRotated ? 'resetRotation' : 'rotateGrid';
+        rotateButton.textContent = translations[state.currentLang][key] || key; // Обновляем текст из-за языка
+        rotateButton.classList.toggle('active', state.isGridRotated);
+    }
+}
+
+export function updateDistanceToHGButtonVisualState() { // Только визуальное состояние
+    const distanceButton = document.getElementById('distanceToHGButton');
+    if (distanceButton) {
+        distanceButton.classList.toggle('active', state.showDistanceToHG);
+    }
 }
 
 // Адаптация под размер экрана

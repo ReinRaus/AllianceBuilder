@@ -7,6 +7,8 @@ export let ghostBuilding = null; // { type, x, y, size, areaSize }
 export let draggedType = null; // string, тип перетаскиваемого элемента с тулбара
 export let currentLang = 'ru';
 export let cursorGhostIcon = null; // DOM-элемент для иконки, следующей за курсором
+export let isGridRotated = false;
+export let showDistanceToHG = false; // Новый флаг для режима "До адских врат"
 
 // Функции-сеттеры для изменения состояния.
 // Это хороший паттерн, если в будущем понадобится логика при изменении состояния.
@@ -33,4 +35,10 @@ export function setCurrentLang(newCurrentLang) {
 }
 export function setCursorGhostIcon(newCursorGhostIcon) {
     cursorGhostIcon = newCursorGhostIcon;
+}
+export function setIsGridRotated(rotated) {
+    isGridRotated = rotated;
+}
+export function setShowDistanceToHG(show) {
+    showDistanceToHG = show;
 }

@@ -126,6 +126,17 @@ export function setupDragAndDrop() {
 
     buildingItems.forEach(item => {
         item.addEventListener('dragstart', (e) => {
+            if (state.isGridRotated) {
+                // Вызываем функцию, которая находится в app.js или uiManager.js
+                // для сброса поворота. Это требует экспорта/импорта.
+                // Проще всего здесь напрямую манипулировать классом и состоянием.
+                state.setIsGridRotated(false);
+                document.querySelector('.grid-container').classList.remove('rotated');
+                // Можно обновить текст кнопки поворота, если есть доступ
+                // const rotateButton = document.getElementById('rotateGridButton');
+                // if (rotateButton) rotateButton.textContent = "Повернуть сетку";
+            }
+
             e.dataTransfer.setData('text/plain', item.dataset.type);
             e.dataTransfer.setDragImage(emptyDragImage, 0, 0); // Используем пустое изображение
 

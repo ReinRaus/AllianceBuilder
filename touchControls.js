@@ -7,6 +7,12 @@ export function addTouchHandlersToBuilding(buildingEl, building) {
     buildingEl.addEventListener('touchstart', (e) => {
         if (e.touches.length === 1) { // Только для одного касания (перемещение)
             // e.preventDefault(); // Может мешать pinch-zoom, если неаккуратно
+            if (state.isGridRotated) {
+                state.setIsGridRotated(false);
+                document.querySelector('.grid-container').classList.remove('rotated');
+                // Обновить текст кнопки поворота, если нужно
+            }
+
             selectBuilding(building.id);
 
             const touch = e.touches[0];

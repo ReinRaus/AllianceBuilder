@@ -15,10 +15,16 @@
             <input type="number" id="gridSizeInput" class="grid-size-input" min="10" max="100" value="50"/>
             <button id="applyGridSize" data-key="apply">Применить</button>
         </div>
-        <div class="language-switcher">
-            <button class="language-btn active" data-lang="ru">RU</button>
-            <button class="language-btn" data-lang="en">EN</button>
-        </div>
+        <div class="header-actions"> <!-- Обертка для кнопок управления видом -->
+            <button id="rotateGridButton" class="control-btn" data-key="rotateGrid">Повернуть сетку</button>
+            <button id="distanceToHGButton" class="control-btn" data-key="distanceToHGLabel">До Адских Врат</button>
+        </div> 
+    <div class="language-switcher">
+        <button class="language-btn" data-lang="en">EN</button>
+        <button class="language-btn active" data-lang="ru">RU</button>
+        <button class="language-btn" data-lang="de">DE</button>   <!-- Новая кнопка -->
+        <button class="language-btn" data-lang="pt_br">PT-BR</button> <!-- Новая кнопка -->
+    </div>
     </header>
 
     <div class="main-container">
@@ -56,7 +62,16 @@
                 <div class="icon">⚠️</div>
                 <div class="building-name" data-key="deadzone">Мертвая зона</div>
             </div>
-        </div>
+            <!-- Кнопки смещения -->
+            <div class="shift-controls">
+                <button id="shiftUpButton" class="shift-btn" title="Сдвинуть всё вверх">↑</button>
+                <button id="shiftDownButton" class="shift-btn" title="Сдвинуть всё вниз">↓</button>
+                <button id="shiftLeftButton" class="shift-btn" title="Сдвинуть всё влево">←</button>
+                <button id="shiftRightButton" class="shift-btn" title="Сдвинуть всё вправо">→</button>
+            </div>
+            </div>
+
+   
 
         <div class="grid-container">
             <div class="grid" id="grid"></div>

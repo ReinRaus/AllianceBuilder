@@ -1,7 +1,74 @@
 import { buildingConfig, translations } from './config.js';
 import * as state from './state.js';
-import { updateBuildingsList, showRenameModal } from './uiManager.js';
+import { updateBuildingsList, showRenameModal, updateCastleDistanceDisplay  } from './uiManager.js';
 import { addTouchHandlersToBuilding } from './touchControls.js';
+
+/**
+ * Проверяет, возможно ли сместить все здания в указанном направлении.
+ * @param {number} dx - Смещение по X (1, -1, или 0).
+ * @param {number} dy - Смещение по Y (1, -1, или 0).
+ * @returns {boolean} - true, если смещение возможно, иначе false.
+ */
+function canShiftAllBuildings(dx, dy) {
+    if (state.buildings.length === 0) return false; // Нечего смещать
+
+    for (const building of state.buildings) {
+        const newX = building.x + dx;
+        const newY = building.y + dy;
+        const buildingWidth = building.width || building.size;
+        const buildingHeight = building.height || building.size;
+
+        // Проверка выхода за пределы сетки
+        if (newX < 0 || newX + buildingWidth > state.gridSize ||
+            newY < 0 || newY + buildingHeight > state.gridSize) {
+            return false; // Одно из зданий выйдет за пределы
+        }
+    }
+    return true; // Все здания могут быть смещены
+}
+
+/**
+ * Смещает все здания на сетке.
+ * Важно: Эта функция НЕ проверяет на перекрытия между зданиями после смещения,
+ * так как все здания смещаются одновременно, сохраняя относительное положение.
+ * Проверка на выход за границы сетки должна быть сделана заранее с помощью canShiftAllBuildings.
+ * @param {number} dx - Смещение по X.
+ * @param {number} dy - Смещение по Y.
+ */
+export function shiftAllBuildings(dx, dy) {
+    if (!canShiftAllBuildings(dx, dy)) {
+        alert(translations[state.currentLang]?.cannotShiftFurther || "Cannot shift buildings further."); // Добавить перевод
+        return;
+    }
+
+    // Важно: Обновляем координаты в два прохода, чтобы избежать проблем
+    // если бы мы обновляли DOM и данные в одном цикле и это влияло бы на checkOverlap
+    // (хотя в данном случае мы не делаем checkOverlap).
+    // Но для чистоты - сначала обновляем данные, потом DOM.
+
+    const originalPositions = state.buildings.map(b => ({ ...b })); // Копируем для возможного отката, если бы была сложная проверка
+
+    let requiresDistanceUpdate = false;
+
+    // 1. Обновить координаты в объектах зданий
+    state.buildings.forEach(building => {
+        building.x += dx;
+        building.y += dy;
+        if (building.type === 'castle' || building.type === 'hellgates') {
+            requiresDistanceUpdate = true;
+        }
+    });
+
+    // 2. Обновить DOM для каждого здания
+    state.buildings.forEach(building => {
+        updateBuilding(building); // Эта функция обновляет style.left, style.top и т.д.
+    });
+
+    // 3. Если активен режим "До адских врат" и были смещены замки/врата, обновить их отображение
+    if (state.showDistanceToHG && requiresDistanceUpdate) {
+        updateCastleDistanceDisplay();
+    }
+}
 
 // Проверка перекрытия с другими зданиями
 export function checkOverlap(x, y, width, height) {
@@ -86,6 +153,12 @@ export function addBuildingToGrid(building) {
 
     buildingEl.addEventListener('mousedown', (e) => {
         if (e.button === 0) { // Левая кнопка мыши
+            if (state.isGridRotated) {
+                state.setIsGridRotated(false);
+                document.querySelector('.grid-container').classList.remove('rotated');
+                // Обновить текст кнопки поворота, если нужно
+            }
+
             selectBuilding(building.id);
 
             const startMouseX = e.clientX;
