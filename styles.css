@@ -150,11 +150,6 @@ header h1 {
 .building-item.dragging-source-transparent {
     opacity: 0.1 !important; /* Делаем исходный элемент почти невидимым */
 }
-/* REFACTOR_SUGGESTION: .building-item.dragging-over-grid не используется в JS, возможно, устарел */
-/* .building-item.dragging-over-grid {
-    opacity: 0;
-    transition: opacity 0.1s ease-out;
-} */
 
 .shift-controls { /* Контейнер для кнопок смещения всех зданий */
     display: flex;
@@ -200,6 +195,9 @@ header h1 {
     margin: 20px;
     background-color: white;
     /* Свойства grid-template-columns/rows задаются из JS */
+    /* Поворот сетки */
+    transform-origin: center center; /* Устанавливаем центр вращения */
+    transition: transform 0.3s ease-in-out; /* Плавный переход для свойства transform */
 }
 
 .grid-cell { /* Отдельная ячейка сетки */
@@ -212,8 +210,6 @@ header h1 {
 /* Поворот сетки */
 .grid-container.rotated .grid {
     transform: rotate(-45deg);
-    transform-origin: center center;
-    transition: transform 0.3s ease-in-out;
 }
 /* POTENTIAL_ISSUE: При повороте сетки, если она не квадратная или выходит за пределы видимой области,
                     могут появиться пустые пространства или обрезаться углы.
