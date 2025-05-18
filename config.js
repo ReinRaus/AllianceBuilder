@@ -24,8 +24,7 @@ export const translations = {
         rename: "Переименовать", // Текст для кнопки переименования в списке
         delete: "Удалить", // Текст для кнопки удаления в списке
         playerName: "Имя игрока", // Плейсхолдер для инпута имени
-        saveButton: "Сохранить", // Текст для кнопки "Сохранить/Поделиться состоянием" в шапке
-        // defaultCastleNamePrefix: "Замок ", // POTENTIAL_ISSUE: Не используется в текущем JS (имя замка просто номер)
+        shareLink: "Поделиться ссылкой", // Текст для кнопки "Сохранить/Поделиться состоянием" в шапке
         rotateGrid: "Повернуть сетку",
         resetRotation: "Сбросить поворот",
         distanceToHGLabel: "До Адских Врат",
@@ -53,8 +52,7 @@ export const translations = {
         rename: "Rename",
         delete: "Delete",
         playerName: "Player Name",
-        saveButton: "Save",
-        // defaultCastleNamePrefix: "Castle ", // POTENTIAL_ISSUE: Не используется
+        shareLink: "Share Link",
         rotateGrid: "Rotate Grid",
         resetRotation: "Reset Rotation",
         distanceToHGLabel: "To Hell Gates",
@@ -82,7 +80,7 @@ export const translations = {
         rename: "Renomear",
         delete: "Excluir",
         playerName: "Nome do Jogador",
-        saveButton: "Salvar",
+        shareLink: "Compartilhar Link",
         defaultCastleNamePrefix: "Castelo ", // POTENTIAL_ISSUE: Не используется, но оставлен для примера
         rotateGrid: "Girar Grade",
         resetRotation: "Resetar Rotação",
@@ -111,8 +109,7 @@ export const translations = {
         rename: "Umbenennen",
         delete: "Löschen",
         playerName: "Spielername",
-        saveButton: "Speichern",
-        defaultCastleNamePrefix: "Burg ", // POTENTIAL_ISSUE: Не используется
+        shareLink: "Link teilen",
         rotateGrid: "Raster drehen",
         resetRotation: "Drehung zurücksetzen",
         distanceToHGLabel: "Zu den Höllentoren",

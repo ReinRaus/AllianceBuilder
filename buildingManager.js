@@ -1,6 +1,6 @@
 import { buildingConfig, translations } from './config.js';
 import * as state from './state.js';
-import { updateBuildingsList, showRenameModal, updateCastleDistanceDisplay } from './uiManager.js';
+import { updateBuildingsList, updateCastleDistanceDisplay, updateRotateButtonVisualState } from './uiManager.js';
 import { addTouchHandlersToBuilding } from './touchControls.js';
 
 // --- Функции для управления размещением и свойствами зданий ---
@@ -184,9 +184,7 @@ export function addBuildingToGrid(building) {
             if (state.isGridRotated) { // Сброс поворота сетки перед началом перетаскивания
                 state.setIsGridRotated(false);
                 document.querySelector('.grid-container').classList.remove('rotated');
-                // POTENTIAL_ISSUE: Нужно вызвать updateRotateButtonVisualState() из uiManager
-                // для обновления вида кнопки. Требуется импорт или передача колбэка.
-                // В текущем коде app.js эта логика есть, но здесь она отсутствует.
+                updateRotateButtonVisualState();
             }
             selectBuilding(building.id);
 

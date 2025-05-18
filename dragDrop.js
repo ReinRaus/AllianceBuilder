@@ -1,6 +1,7 @@
 import { buildingConfig, translations } from './config.js'; // translations импортирован, но не используется в этом файле. POTENTIAL_ISSUE: Лишний импорт?
 import * as state from './state.js';
 import { createBuilding, checkOverlap } from './buildingManager.js';
+import { updateRotateButtonVisualState } from './uiManager.js';
 // showPlayerNameModal не используется после рефакторинга создания замка
 // import { showPlayerNameModal } from './uiManager.js';
 
@@ -151,7 +152,7 @@ export function setupDragAndDrop() {
             if (state.isGridRotated) { // Сброс поворота сетки, если он был активен
                 state.setIsGridRotated(false);
                 document.querySelector('.grid-container').classList.remove('rotated');
-                // POTENTIAL_ISSUE: Нужно вызвать updateRotateButtonVisualState() из uiManager.
+                updateRotateButtonVisualState();
             }
 
             e.dataTransfer.setData('text/plain', item.dataset.type); // Сохраняем тип здания

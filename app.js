@@ -213,7 +213,7 @@ function setupGlobalEventListeners() {
     });
 
     // Кнопка "Сохранить/Поделиться состоянием"
-    const saveMainButton = document.getElementById('saveButton');
+    const saveMainButton = document.getElementById('shareButton');
     if (saveMainButton) saveMainButton.addEventListener('click', saveStateToBase64);
 
     // Адаптация интерфейса при изменении размера окна
