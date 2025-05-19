@@ -1,233 +1,482 @@
+// app.js - Основной файл приложения, точка входа и координатор модулей
+
+// --- Импорты модулей и конфигурации ---
 import * as state from './state.js';
-import { translations } from './config.js'; // Для доступа к переводам напрямую в app.js
+import { translations, buildingConfig } from './config.js';
 
 // Функциональные модули
 import { setupGrid, redrawAllBuildings } from './gridUtils.js';
 import {
-    createBuilding as createBuildingInManager, // Переименовываем для ясности, если будут локальные createBuilding
-    updateBuilding as updateBuildingInManager, // Аналогично
+    createBuilding as createBuildingInManager,
+    updateBuilding as updateBuildingInManager,
     deleteBuilding as deleteBuildingFromManager,
-    shiftAllBuildings
+    shiftAllBuildings,
+    checkOverlap as checkOverlapInManager // Импортируем checkOverlap
 } from './buildingManager.js';
-import { setupDragAndDrop, createCursorGhostIconDOM } from './dragDrop.js';
 import {
-    updateLanguage,
-    checkScreenSize,
-    updateCastleDistanceDisplay,
-    updateRotateButtonVisualState,
-    updateDistanceToHGButtonVisualState
+    setupDragAndDrop, createCursorGhostIconDOM,
+    createMobilePlacementGhostDOM, showMobilePlacementGhost,
+    positionMobilePlacementGhost, hideMobilePlacementGhost,
+    updateFullGhostOnGrid, removeFullGhostFromGrid
+} from './dragDrop.js';
+import {
+    updateLanguage, checkScreenSize, updateCastleDistanceDisplay,
+    updateRotateButtonVisualState, updateDistanceToHGButtonVisualState,
+    showPlayerNameModal, showRenameModal, updateSelectedBuildingToolbar
 } from './uiManager.js';
 import { saveStateToBase64, checkLocationHash } from './persistence.js';
-import { setupTouchPinchZoom, setupTouchDragAndDrop } from './touchControls.js';
+import { setupTouchPinchZoom } from './touchControls.js'; // addTouchHandlersToBuilding больше не нужен здесь, он в buildingManager
 
+// --- Локальное состояние UI этого модуля (app.js) ---
+let isSidebarOpen = false;
 
-// --- Функции управления состоянием UI, специфичные для app.js ---
+// Переменные для хранения ссылок на обработчики событий мобильного D&D
+let currentMobileToolType = null; // Тип здания, выбранного на мобильной панели
+let activeMobileToolButton = null; // Кнопка инструмента, которая сейчас "активна"
 
-/** Переключает режим поворота сетки и обновляет UI кнопки. */
+// --- Функции управления основным UI и режимами ---
 function toggleGridRotation() {
-    state.setIsGridRotated(!state.isGridRotated); // Инвертируем состояние
-    document.querySelector('.grid-container').classList.toggle('rotated', state.isGridRotated);
-    updateRotateButtonVisualState(); // Обновляем вид кнопки
-
-    // Если активен режим расстояний, перерисовываем их, так как поворот мог сброситься
+    cancelMobileDragMode();
+    state.setIsGridRotated(!state.isGridRotated);
+    document.querySelector('.grid-container')?.classList.toggle('rotated', state.isGridRotated);
+    updateRotateButtonVisualState();
     if (state.showDistanceToHG) {
         updateCastleDistanceDisplay();
     }
 }
 
-/** Переключает режим отображения расстояния до Адских Врат и обновляет UI. */
 function toggleDistanceToHGMode() {
-    state.setShowDistanceToHG(!state.showDistanceToHG); // Инвертируем состояние
-    updateDistanceToHGButtonVisualState(); // Обновляем вид кнопки
-    updateCastleDistanceDisplay(); // Обновляем отображение на замках
+    cancelMobileDragMode();
+    state.setShowDistanceToHG(!state.showDistanceToHG);
+    updateDistanceToHGButtonVisualState();
+    updateCastleDistanceDisplay();
+}
+
+// --- Функции управления мобильным интерфейсом ---
+function toggleMobileSidebar() {
+    const sidebar = document.getElementById('mobileSidebar');
+    const pageContent = document.getElementById('pageContent');
+    const body = document.body;
+
+    isSidebarOpen = !isSidebarOpen;
+    sidebar?.classList.toggle('open', isSidebarOpen);
+    body.classList.toggle('sidebar-open', isSidebarOpen);
+
+    if (isSidebarOpen) {
+        cancelMobileDragMode();
+        synchronizeMobileControls();
+    } else {
+        if (sidebar?.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
+    }
+}
+
+function initializeMobileInterface() {
+    populateMobileToolbarSlider();
+    setupMobileSidebarContent();
+    synchronizeMobileControls();
+}
+
+function populateMobileToolbarSlider() {
+    const sliderContent = document.querySelector('#mobileToolbarSlider .slider-content');
+    const desktopToolbar = document.getElementById('toolbarDesktop');
+    if (!sliderContent || !desktopToolbar) return;
+    sliderContent.innerHTML = '';
+
+    desktopToolbar.querySelectorAll('.building-item[data-type]').forEach(item => {
+        const type = item.dataset.type;
+        const config = buildingConfig[type];
+        if (!config) return;
+
+        const sliderItemButton = document.createElement('button');
+        sliderItemButton.className = 'tool-slider-item building-tool';
+        sliderItemButton.dataset.type = type;
+        sliderItemButton.innerHTML = `<span class="icon">${config.icon}</span>`;
+        const translatedName = translations[state.currentLang]?.[type] || type;
+        sliderItemButton.setAttribute('aria-label', translatedName);
+        sliderItemButton.title = translatedName;
+
+        // Используем 'click' для простоты, т.к. touchstart/move/end будут для сетки
+        sliderItemButton.addEventListener('click', () => handleMobileBuildingToolSelect(type, sliderItemButton));
+        sliderContent.appendChild(sliderItemButton);
+    });
+
+    const shiftControlsDesktop = desktopToolbar.querySelector('.shift-controls');
+    if (shiftControlsDesktop) {
+        shiftControlsDesktop.querySelectorAll('.shift-btn').forEach(btn => {
+            const newShiftBtn = document.createElement('button');
+            newShiftBtn.className = 'tool-slider-item shift-tool-icon';
+            newShiftBtn.innerHTML = btn.textContent;
+            newShiftBtn.title = btn.title || btn.getAttribute('aria-label');
+            newShiftBtn.setAttribute('aria-label', btn.title || btn.getAttribute('aria-label'));
+            const actionId = btn.id.toLowerCase();
+            let dx = 0, dy = 0;
+            if (actionId.includes('up')) dy = -1;
+            else if (actionId.includes('down')) dy = 1;
+            else if (actionId.includes('left')) dx = -1;
+            else if (actionId.includes('right')) dx = 1;
+            newShiftBtn.addEventListener('click', () => handleShift(dx, dy));
+            sliderContent.appendChild(newShiftBtn);
+        });
+    }
+}
+
+function setupMobileSidebarContent() {
+    const desktopLangSwitcher = document.querySelector('.language-switcher.desktop-only');
+    const mobileLangContainer = document.querySelector('.language-switcher-mobile');
+    if (desktopLangSwitcher && mobileLangContainer && mobileLangContainer.children.length === 0) {
+        desktopLangSwitcher.querySelectorAll('.language-btn').forEach(btn => {
+            const clone = btn.cloneNode(true);
+            clone.addEventListener('click', () => languageChangeHandler(clone.dataset.lang));
+            mobileLangContainer.appendChild(clone);
+        });
+    }
+}
+
+function synchronizeMobileControls() {
+    const mobileGridSizeInput = document.getElementById('gridSizeInputMobile');
+    if (mobileGridSizeInput) mobileGridSizeInput.value = state.gridSize;
+    updateRotateButtonVisualState();
+    updateDistanceToHGButtonVisualState();
+    const mobileLangContainer = document.querySelector('.language-switcher-mobile');
+    if (mobileLangContainer) {
+        mobileLangContainer.querySelectorAll('.language-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.lang === state.currentLang);
+        });
+    }
+}
+
+// --- Логика мобильного "выбора инструмента и размещения" ---
+
+/** Отменяет текущий режим выбора инструмента для мобильного размещения. */
+function cancelMobileDragMode() {
+    if (!state.isMobileDragging) return;
+
+    state.setIsMobileDragging(false);
+    currentMobileToolType = null; // Сбрасываем выбранный тип
+    if (activeMobileToolButton) {
+        activeMobileToolButton.classList.remove('active');
+        activeMobileToolButton = null;
+    }
+
+    hideMobilePlacementGhost(); // Маленький призрак у пальца/мыши (если использовался)
+    removeFullGhostFromGrid();  // Полный призрак на сетке
+
+    // Удаляем обработчики с сетки, если они были добавлены для этого режима
+    const gridElement = document.getElementById('grid');
+    if (gridElement) {
+        gridElement.removeEventListener('touchmove', handleMobileGridHover);
+        gridElement.removeEventListener('mousemove', handleMobileGridHover); // Для отладки мышью
+        gridElement.removeEventListener('touchend', handleMobileGridPlacement);
+        gridElement.removeEventListener('click', handleMobileGridPlacement); // Для отладки мышью
+        gridElement.removeEventListener('touchleave', handleMobileGridLeave); // Для скрытия призрака
+        gridElement.removeEventListener('mouseleave', handleMobileGridLeave); // Для скрытия призрака
+    }
+    // Сбрасываем глобальное состояние draggedType, которое могло использоваться для призрака
+    state.setDraggedType(null);
 }
 
 
+/** Обрабатывает выбор инструмента здания на мобильной панели. */
+function handleMobileBuildingToolSelect(type, clickedItem) {
+    if (state.isMobileDragging && currentMobileToolType === type) {
+        // Повторный клик на тот же активный инструмент - отменяем режим
+        cancelMobileDragMode();
+        return;
+    }
+
+    cancelMobileDragMode(); // Отменяем предыдущий выбор, если он был
+
+    if (state.isGridRotated) {
+        state.setIsGridRotated(false);
+        document.querySelector('.grid-container')?.classList.remove('rotated');
+        updateRotateButtonVisualState();
+    }
+
+    state.setIsMobileDragging(true); // Включаем режим "ожидания тапа на сетку"
+    currentMobileToolType = type;    // Запоминаем выбранный тип
+    state.setDraggedType(type);      // Устанавливаем для отображения призрака
+    activeMobileToolButton = clickedItem;
+    activeMobileToolButton?.classList.add('active');
+
+    // Показываем маленький призрак у пальца/мыши как индикатор активного инструмента
+    // Это опционально, можно сразу показывать полный призрак на сетке при hover
+    // showMobilePlacementGhost(type);
+
+    // Добавляем слушатели на сетку для отображения "полного призрака" при наведении
+    // и для размещения здания при тапе/клике.
+    const gridElement = document.getElementById('grid');
+    if (!gridElement) {
+        cancelMobileDragMode();
+        return;
+    }
+
+    gridElement.addEventListener('touchmove', handleMobileGridHover, { passive: false });
+    gridElement.addEventListener('mousemove', handleMobileGridHover); // Для отладки мышью
+    gridElement.addEventListener('touchend', handleMobileGridPlacement);
+    gridElement.addEventListener('click', handleMobileGridPlacement);   // Для отладки мышью
+    gridElement.addEventListener('touchleave', handleMobileGridLeave);
+    gridElement.addEventListener('mouseleave', handleMobileGridLeave);
+}
+
+/** Обрабатывает "наведение" (touchmove/mousemove) на сетку в режиме мобильного размещения. */
+function handleMobileGridHover(event) {
+    if (!state.isMobileDragging || !currentMobileToolType) return;
+    if (event.type === 'touchmove') event.preventDefault(); // Предотвращаем скролл
+
+    const gridElement = document.getElementById('grid');
+    const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+    const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+    const rect = gridElement.getBoundingClientRect();
+    const x = Math.floor((clientX - rect.left) / state.cellSize);
+    const y = Math.floor((clientY - rect.top) / state.cellSize);
+
+    if (x >= 0 && x < state.gridSize && y >= 0 && y < state.gridSize) {
+        updateFullGhostOnGrid(currentMobileToolType, x, y); // Показываем/обновляем полный призрак
+    } else {
+        removeFullGhostFromGrid(); // Убираем полный призрак, если палец/мышь вне сетки
+    }
+}
+
+/** Обрабатывает "уход" пальца/мыши с сетки в режиме мобильного размещения. */
+function handleMobileGridLeave() {
+    if (state.isMobileDragging) {
+        removeFullGhostFromGrid();
+    }
+}
+
+/** Обрабатывает "тап" (touchend) или клик на сетку для размещения выбранного здания. */
+function handleMobileGridPlacement(event) {
+    if (!state.isMobileDragging || !currentMobileToolType) {
+        // Если это был клик, а не touchend после выбора инструмента, и режим не активен, ничего не делаем.
+        // Если это touchend, но режим уже сброшен (например, из-за touchcancel), тоже ничего.
+        return;
+    }
+    // Для клика мыши, если он произошел после выбора инструмента
+    if (event.type === 'click' && (!activeMobileToolButton || !activeMobileToolButton.classList.contains('active'))) {
+        return;
+    }
+
+
+    const gridElement = document.getElementById('grid');
+    const clientX = event.changedTouches ? event.changedTouches[0].clientX : event.clientX;
+    const clientY = event.changedTouches ? event.changedTouches[0].clientY : event.clientY;
+    const rect = gridElement.getBoundingClientRect();
+    const x = Math.floor((clientX - rect.left) / state.cellSize);
+    const y = Math.floor((clientY - rect.top) / state.cellSize);
+
+    if (x >= 0 && x < state.gridSize && y >= 0 && y < state.gridSize) {
+        const typeToPlace = currentMobileToolType;
+        const config = buildingConfig[typeToPlace];
+        
+        // Используем checkOverlapInManager для проверки перед созданием
+        if (config && !checkOverlapInManager(x, y, config.size, config.size)) {
+            if (typeToPlace === 'castle') {
+                const castleCount = state.buildings.filter(b => b.type === 'castle').length;
+                const prefixKey = translations[state.currentLang]?.defaultCastleNamePrefix || "Castle #";
+                const defaultName = prefixKey.replace('#', castleCount + 1);
+                createBuildingInManager(typeToPlace, x, y, defaultName);
+            } else if (typeToPlace === 'deadzone') {
+                createBuildingInManager(typeToPlace, x, y, '');
+            } else {
+                createBuildingInManager(typeToPlace, x, y);
+            }
+        } else {
+            alert(translations[state.currentLang]?.cannotOverlapMsg || "Невозможно разместить здание здесь.");
+        }
+    }
+    // После попытки размещения (успешной или нет) отменяем режим выбора инструмента.
+    // Это позволит пользователю сразу выбрать другой инструмент или сделать другое действие.
+    cancelMobileDragMode();
+}
+
+
+// --- Общие обработчики для UI ---
+const handleShift = (dx, dy) => {
+    cancelMobileDragMode();
+    if (state.isGridRotated) {
+        state.setIsGridRotated(false);
+        document.querySelector('.grid-container')?.classList.remove('rotated');
+        updateRotateButtonVisualState();
+    }
+    shiftAllBuildings(dx, dy);
+};
+
+function languageChangeHandler(lang) {
+    if (state.currentLang === lang || !translations[lang]) return;
+    cancelMobileDragMode();
+    state.setCurrentLang(lang);
+    localStorage.setItem('alliancePlannerLang', lang);
+    document.querySelectorAll('.language-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.lang === lang);
+    });
+    updateLanguage();
+    if (document.body.classList.contains('mobile-view')) {
+        populateMobileToolbarSlider();
+    }
+    synchronizeMobileControls();
+}
+
+function applyGridSizeChange() {
+    cancelMobileDragMode();
+    const inputId = document.body.classList.contains('mobile-view') ? 'gridSizeInputMobile' : 'gridSizeInputDesktop';
+    const gridSizeInput = document.getElementById(inputId);
+    if (!gridSizeInput) return;
+    const newSize = parseInt(gridSizeInput.value, 10);
+
+    if (newSize >= 10 && newSize <= 100) {
+        state.setGridSize(newSize);
+        localStorage.setItem('alliancePlannerGridSize', newSize.toString());
+        document.getElementById('gridSizeInputDesktop').value = newSize; // Синхронизируем оба инпута
+        document.getElementById('gridSizeInputMobile').value = newSize;
+        setupGrid();
+        redrawAllBuildings();
+    } else {
+        gridSizeInput.value = state.gridSize;
+        alert(translations[state.currentLang]?.invalidGridSize || "Размер сетки должен быть от 10 до 100.");
+    }
+}
+
 // --- Инициализация приложения ---
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Восстановление состояния из localStorage (язык, размер сетки)
     const savedLang = localStorage.getItem('alliancePlannerLang');
-    if (savedLang && translations[savedLang]) { // Проверяем, что сохраненный язык существует в переводах
-        state.setCurrentLang(savedLang);
-    }
+    if (savedLang && translations[savedLang]) state.setCurrentLang(savedLang);
     const savedGridSize = localStorage.getItem('alliancePlannerGridSize');
     if (savedGridSize) {
         const parsedGridSize = parseInt(savedGridSize, 10);
-        if (!isNaN(parsedGridSize) && parsedGridSize >=10 && parsedGridSize <=100) {
-             state.setGridSize(parsedGridSize);
+        if (!isNaN(parsedGridSize) && parsedGridSize >= 10 && parsedGridSize <= 100) {
+            state.setGridSize(parsedGridSize);
         }
     }
 
-    // 2. Создание динамических DOM-элементов (например, иконка-призрак у курсора)
     createCursorGhostIconDOM();
+    // createMobilePlacementGhostDOM(); // Мобильный призрак у пальца больше не нужен, используем полный
 
-    // 3. Загрузка состояния из URL (хэша), если оно там есть
-    checkLocationHash(); // Это может обновить state.buildings и другие параметры, если они сохраняются
+    checkLocationHash();
 
-    // 4. Первичная настройка UI на основе текущего (возможно, загруженного) состояния
-    document.getElementById('gridSizeInput').value = state.gridSize;
-    document.querySelectorAll('.language-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.lang === state.currentLang);
-    });
+    document.getElementById('gridSizeInputDesktop').value = state.gridSize;
+    // Кнопки языка на десктопе будут обновлены в languageChangeHandler или synchronizeMobileControls -> updateLanguage
 
-    setupGrid();        // Инициализация сетки (создание ячеек)
-    updateLanguage();   // Установка всех текстов интерфейса, включая кнопки управления видом
-    redrawAllBuildings(); // Отрисовка зданий из state.buildings
+    setupGrid();
+    initializeMobileInterface();
+    updateLanguage();
+    redrawAllBuildings();
+    updateSelectedBuildingToolbar();
 
-    // Обновление визуального состояния кнопок управления видом после полной инициализации UI
-    // updateLanguage уже должен вызывать updateRotateButtonVisualState
-    // updateDistanceToHGButtonVisualState(); // Вызывается из updateLanguage косвенно, если кнопки имеют data-key
-
-    // 5. Настройка глобальных обработчиков событий
     setupGlobalEventListeners();
-
-    // 6. Инициализация специфичных элементов управления (Drag'n'Drop, Touch)
     setupDragAndDrop();
     setupTouchPinchZoom();
-    setupTouchDragAndDrop(); // Инициализация, даже если не полностью реализована
-
-    // 7. Первичная проверка размера экрана (также вызывается в updateLanguage)
-    checkScreenSize();
 });
 
 // --- Настройка глобальных обработчиков событий ---
 function setupGlobalEventListeners() {
-    // Обработчики для модальных окон
-    const playerNameModal = document.getElementById('playerNameModal');
-    const renameModal = document.getElementById('renameModal');
-    const closeButtons = document.querySelectorAll('.modal .close');
-    const savePlayerNameButton = document.getElementById('savePlayerName');
-    const saveRenameButton = document.getElementById('saveRename');
-
-    closeButtons.forEach(btn => {
-        btn.addEventListener('click', (e) => { // Закрытие любой модалки по крестику
-            const modalToClose = e.target.closest('.modal');
-            if (modalToClose) {
-                modalToClose.style.display = 'none';
-            }
-        });
+    document.getElementById('openSidebarBtn')?.addEventListener('click', toggleMobileSidebar);
+    document.getElementById('closeSidebarBtn')?.addEventListener('click', toggleMobileSidebar);
+    document.body.addEventListener('click', (event) => {
+        if (isSidebarOpen && event.target === document.body && document.body.classList.contains('sidebar-open')) {
+            toggleMobileSidebar();
+        }
     });
 
-    // Сохранение имени при создании нового замка/зоны
-    savePlayerNameButton.addEventListener('click', () => {
+    const playerNameModal = document.getElementById('playerNameModal');
+    const renameModal = document.getElementById('renameModal');
+    document.querySelectorAll('.modal .close').forEach(btn => {
+        btn.addEventListener('click', () => {
+            cancelMobileDragMode();
+            btn.closest('.modal').style.display = 'none';
+        });
+    });
+    document.getElementById('savePlayerName').addEventListener('click', () => {
+        cancelMobileDragMode();
         const x = parseInt(playerNameModal.dataset.x, 10);
         const y = parseInt(playerNameModal.dataset.y, 10);
         const buildingType = playerNameModal.dataset.buildingType || 'castle';
-        const playerName = document.getElementById('playerNameInput').value.trim(); // Обрезаем пробелы
-
+        const playerName = document.getElementById('playerNameInput').value.trim();
         createBuildingInManager(buildingType, x, y, playerName);
         playerNameModal.style.display = 'none';
     });
-
-    // Сохранение нового имени при переименовании
-    saveRenameButton.addEventListener('click', () => {
+    document.getElementById('saveRename').addEventListener('click', () => {
+        cancelMobileDragMode();
         const buildingId = renameModal.dataset.buildingId;
         const newName = document.getElementById('renameInput').value.trim();
         const building = state.buildings.find(b => b.id === buildingId);
-
         if (building) {
             building.playerName = newName;
-            // POTENTIAL_ISSUE: Аналогично, updateBuildingInManager - это то, что нужно вызывать.
-            updateBuildingInManager(building); // Обновляем данные и DOM
-            // updateBuildingsList(); // updateBuildingInManager может уже вызывать это, или нужно здесь.
-            // В текущей структуре updateBuilding (в buildingManager) не обновляет список.
-            // А uiManager.updateBuildingsList должна быть вызвана.
-            // Проверить, где вызывается uiManager.updateBuildingsList после изменения имени.
-            // Логично, если updateBuildingInManager сам обновляет всё, что нужно, или возвращает флаг.
-            // Сейчас updateBuilding в buildingManager не вызывает updateBuildingsList.
-            // Это значит, что список не обновится.
-            // Нужно либо добавить вызов updateBuildingsList в updateBuilding (менее предпочтительно),
-            // либо вызывать его здесь, либо в uiManager.showRenameModal после успешного сохранения.
-            // В uiManager.updateBuildingsList он вызывается, если вызывать его из uiManager.showRenameModal.
-            // Пока оставим как есть, но это точка для проверки.
-            // Решение: uiManager.updateBuildingsList() вызывается из uiManager.updateLanguage(),
-            // а также при каждом изменении массива buildings (create, delete). При простом rename - нет.
-            // Значит, здесь нужен вызов:
-            if (typeof uiManager !== 'undefined' && typeof uiManager.updateBuildingsList === 'function') { // Защита
-                 uiManager.updateBuildingsList();
-            } else if (typeof updateBuildingsList === 'function') { // Если импортирована напрямую
-                 updateBuildingsList(); // POTENTIAL_ISSUE: updateBuildingsList не импортирована напрямую в app.js
+            updateBuildingInManager(building);
+            updateSelectedBuildingToolbar();
+            if (state.showDistanceToHG && building.type === 'castle') {
+                updateCastleDistanceDisplay();
             }
         }
         renameModal.style.display = 'none';
     });
 
-
-    // Обработчики для кнопок управления видом (поворот, расстояние до врат)
-    const rotateGridButton = document.getElementById('rotateGridButton');
-    if (rotateGridButton) {
-        rotateGridButton.addEventListener('click', toggleGridRotation);
-    }
-    const distanceToHGButton = document.getElementById('distanceToHGButton');
-    if (distanceToHGButton) {
-        distanceToHGButton.addEventListener('click', toggleDistanceToHGMode);
-    }
-
-    // Переключение языка
-    const langButtons = document.querySelectorAll('.language-btn');
-    langButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            state.setCurrentLang(btn.dataset.lang);
-            localStorage.setItem('alliancePlannerLang', state.currentLang); // Сохраняем выбор
-            langButtons.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            updateLanguage(); // Обновляем весь интерфейс
-        });
+    const commonViewButtonHandler = (action) => {
+        if (action === 'rotate') toggleGridRotation();
+        else if (action === 'distance') toggleDistanceToHGMode();
+    };
+    ['rotateGridButtonDesktop', 'rotateGridButtonMobile'].forEach(id => {
+        document.getElementById(id)?.addEventListener('click', () => commonViewButtonHandler('rotate'));
+    });
+    ['distanceToHGButtonDesktop', 'distanceToHGButtonMobile'].forEach(id => {
+        document.getElementById(id)?.addEventListener('click', () => commonViewButtonHandler('distance'));
     });
 
-    // Массовое смещение зданий
-    const shiftControls = {
-        Up: document.getElementById('shiftUpButton'),
-        Down: document.getElementById('shiftDownButton'),
-        Left: document.getElementById('shiftLeftButton'),
-        Right: document.getElementById('shiftRightButton')
-    };
-    const handleShift = (dx, dy) => {
-        if (state.isGridRotated) { // Сброс поворота перед смещением
-            state.setIsGridRotated(false);
-            document.querySelector('.grid-container').classList.remove('rotated');
-            updateRotateButtonVisualState(); // Обновить состояние кнопки поворота
-        }
-        shiftAllBuildings(dx, dy); // Вызов функции из buildingManager
-    };
-    if (shiftControls.Up) shiftControls.Up.addEventListener('click', () => handleShift(0, -1));
-    if (shiftControls.Down) shiftControls.Down.addEventListener('click', () => handleShift(0, 1));
-    if (shiftControls.Left) shiftControls.Left.addEventListener('click', () => handleShift(-1, 0));
-    if (shiftControls.Right) shiftControls.Right.addEventListener('click', () => handleShift(1, 0));
+    document.querySelectorAll('.language-switcher.desktop-only .language-btn').forEach(btn => {
+        btn.addEventListener('click', () => languageChangeHandler(btn.dataset.lang));
+    });
 
-    // Изменение размера сетки
-    const gridSizeInput = document.getElementById('gridSizeInput');
-    const applyGridSizeButton = document.getElementById('applyGridSize');
-    applyGridSizeButton.addEventListener('click', () => {
-        const newSize = parseInt(gridSizeInput.value, 10);
-        if (newSize >= 10 && newSize <= 100) {
-            state.setGridSize(newSize);
-            localStorage.setItem('alliancePlannerGridSize', newSize.toString()); // Сохраняем
-            setupGrid();
-            redrawAllBuildings();
-        } else {
-            gridSizeInput.value = state.gridSize; // Восстанавливаем валидное значение
-            alert(translations[state.currentLang]?.invalidGridSize || // POTENTIAL_ISSUE: Ключа нет
-                  (state.currentLang === 'ru' ? "Размер сетки должен быть от 10 до 100." : "Grid size must be between 10 and 100."));
+    document.getElementById('shiftUpButtonDesktop')?.addEventListener('click', () => handleShift(0, -1));
+    document.getElementById('shiftDownButtonDesktop')?.addEventListener('click', () => handleShift(0, 1));
+    document.getElementById('shiftLeftButtonDesktop')?.addEventListener('click', () => handleShift(-1, 0));
+    document.getElementById('shiftRightButtonDesktop')?.addEventListener('click', () => handleShift(1, 0));
+
+    document.getElementById('applyGridSizeDesktop')?.addEventListener('click', applyGridSizeChange);
+    document.getElementById('applyGridSizeMobile')?.addEventListener('click', applyGridSizeChange);
+
+    const shareActionHandler = () => {
+        cancelMobileDragMode();
+        saveStateToBase64();
+    };
+    document.getElementById('shareButtonDesktop')?.addEventListener('click', shareActionHandler);
+    document.getElementById('shareButtonMobile')?.addEventListener('click', shareActionHandler);
+
+    document.getElementById('renameSelectedBuildingBtn')?.addEventListener('click', () => {
+        const button = document.getElementById('renameSelectedBuildingBtn');
+        if (!button.disabled && state.selectedBuilding) {
+            cancelMobileDragMode();
+            showRenameModal(state.selectedBuilding);
+        }
+    });
+    document.getElementById('deleteSelectedBuildingBtn')?.addEventListener('click', () => {
+        const button = document.getElementById('deleteSelectedBuildingBtn');
+        if (!button.disabled && state.selectedBuilding) {
+            cancelMobileDragMode();
+            deleteBuildingFromManager(state.selectedBuilding);
         }
     });
 
-    // Кнопка "Сохранить/Поделиться состоянием"
-    const saveMainButton = document.getElementById('shareButton');
-    if (saveMainButton) saveMainButton.addEventListener('click', saveStateToBase64);
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            const wasMobile = document.body.classList.contains('mobile-view');
+            checkScreenSize();
+            const isNowMobile = document.body.classList.contains('mobile-view');
+            if (isNowMobile !== wasMobile || isNowMobile) {
+                initializeMobileInterface();
+            }
+        }, 200);
+    });
 
-    // Адаптация интерфейса при изменении размера окна
-    window.addEventListener('resize', checkScreenSize);
-
-    // Удаление выделенного здания клавишей Delete/Backspace
     document.addEventListener('keydown', (e) => {
         const activeElement = document.activeElement;
         const isInputFocused = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA');
-
         if ((e.key === 'Delete' || e.key === 'Backspace') && !isInputFocused && state.selectedBuilding) {
-            e.preventDefault(); // Предотвратить стандартное действие (например, переход назад)
+            cancelMobileDragMode();
+            e.preventDefault();
             deleteBuildingFromManager(state.selectedBuilding);
-            // state.selectedBuilding будет сброшен внутри deleteBuildingFromManager
         }
     });
 }
