@@ -1,184 +1,135 @@
-import { translations, buildingConfig } from './config.js';
-import * as state from './state.js';
-// Функции из buildingManager, которые вызываются из UI (например, при клике на кнопки в списке)
-import { selectBuilding, deleteBuilding, updateBuilding as updateBuildingDataAndDOM } from './buildingManager.js';
-// POTENTIAL_ISSUE: createBuilding вызывается из app.js (playerNameModal) и dragDrop.js. Не здесь.
+// uiManager.js
+// Этот модуль отвечает за управление различными аспектами пользовательского интерфейса,
+// такими как отображение и скрытие модальных окон,
+// локализация текстовых элементов, адаптация под размер экрана и обновление
+// визуального состояния кнопок управления режимами и панели инструментов выделенного здания.
+
+import { translations, buildingConfig } from './config.js'; // Конфигурация для локализации и данных о зданиях
+import * as state from './state.js'; // Глобальное состояние для currentLang, selectedBuilding и т.д.
+// Функции из buildingManager для взаимодействия (выделение, удаление)
+import { selectBuilding as selectBuildingInManager, deleteBuilding as deleteBuildingInManager } from './buildingManager.js';
+// updateBuildingData из buildingManager здесь не нужен, т.к. переименование происходит через модалку и затем app.js вызывает updateBuildingInManager
 
 // --- Управление модальными окнами ---
 
 /**
- * Показывает модальное окно для ввода имени игрока или названия мертвой зоны.
- * @param {number} x Координата X для создаваемого здания.
- * @param {number} y Координата Y для создаваемого здания.
- * @param {string} [type='castle'] Тип создаваемого здания ('castle' или 'deadzone').
+ * Показывает модальное окно для ввода имени. Используется при создании замка или мертвой зоны.
+ * @param {number} x - Координата X (в ячейках) для потенциального нового здания.
+ * @param {number} y - Координата Y (в ячейках) для потенциального нового здания.
+ * @param {string} [type='castle'] - Тип здания ('castle' или 'deadzone'), для которого запрашивается имя.
  */
 export function showPlayerNameModal(x, y, type = 'castle') {
     const modal = document.getElementById('playerNameModal');
-    modal.dataset.x = x; // Сохраняем координаты в data-атрибутах для последующего использования
+    if (!modal) {
+        console.error("[uiManager] Модальное окно 'playerNameModal' не найдено.");
+        return;
+    }
+
+    modal.dataset.x = x;
     modal.dataset.y = y;
     modal.dataset.buildingType = type;
 
     const modalTitleEl = modal.querySelector('#modal-title');
     const playerNameInputEl = document.getElementById('playerNameInput');
 
-    // Настройка заголовка и плейсхолдера в зависимости от типа здания и языка
     if (type === 'deadzone') {
-        modalTitleEl.textContent = translations[state.currentLang].renameDeadZoneModalTitle || // POTENTIAL_ISSUE: Ключа нет
-                                   (state.currentLang === 'ru' ? "Название мертвой зоны" : "Dead Zone Name");
-        playerNameInputEl.placeholder = translations[state.currentLang].deadZoneNamePlaceholder || // POTENTIAL_ISSUE: Ключа нет
-                                        (state.currentLang === 'ru' ? "Введите название зоны" : "Enter zone name");
+        modalTitleEl.textContent = translations[state.currentLang]?.renameDeadZoneModalTitle ||
+                                   (state.currentLang === 'ru' ? "Название зоны" : "Zone Name");
+        playerNameInputEl.placeholder = translations[state.currentLang]?.deadZoneNamePlaceholder ||
+                                          (state.currentLang === 'ru' ? "Введите название зоны" : "Enter zone name");
     } else { // 'castle'
-        modalTitleEl.textContent = translations[state.currentLang].modalTitle;
-        playerNameInputEl.placeholder = translations[state.currentLang].playerName;
+        modalTitleEl.textContent = translations[state.currentLang]?.modalTitle ||
+                                   (state.currentLang === 'ru' ? "Имя игрока" : "Player Name");
+        playerNameInputEl.placeholder = translations[state.currentLang]?.playerName ||
+                                          (state.currentLang === 'ru' ? "Имя игрока" : "Player Name");
     }
-    playerNameInputEl.value = ''; // Очистка поля ввода
+    playerNameInputEl.value = '';
     modal.style.display = 'block';
-    playerNameInputEl.focus(); // Фокус на поле ввода
+    playerNameInputEl.focus();
 }
 
 /**
- * Показывает модальное окно для переименования существующего замка или мертвой зоны.
- * @param {string} buildingId ID здания для переименования.
+ * Показывает модальное окно для переименования существующего здания (замка или мертвой зоны).
+ * @param {string} buildingId - ID здания, которое нужно переименовать.
  */
 export function showRenameModal(buildingId) {
     const building = state.buildings.find(b => b.id === buildingId);
-    if (!building) return;
+    if (!building) {
+        console.warn(`[uiManager] Здание с ID '${buildingId}' не найдено для переименования.`);
+        return;
+    }
 
     const modal = document.getElementById('renameModal');
-    modal.dataset.buildingId = buildingId; // Сохраняем ID для кнопки "Сохранить"
+    if (!modal) {
+        console.error("[uiManager] Модальное окно 'renameModal' не найдено.");
+        return;
+    }
 
+    modal.dataset.buildingId = buildingId;
     const renameInputEl = document.getElementById('renameInput');
-    renameInputEl.value = building.playerName || ''; // Заполняем текущим именем
+    renameInputEl.value = building.playerName || '';
 
     const renameModalTitleEl = modal.querySelector('#rename-modal-title');
-    // Настройка заголовка в зависимости от типа здания
     if (building.type === 'deadzone') {
-        renameModalTitleEl.textContent = translations[state.currentLang].renameDeadZoneModalTitle || // POTENTIAL_ISSUE: Ключа нет
-                                           (state.currentLang === 'ru' ? "Переименовать мертвую зону" : "Rename Dead Zone");
+        renameModalTitleEl.textContent = translations[state.currentLang]?.renameDeadZoneModalTitle ||
+                                           (state.currentLang === 'ru' ? "Переименовать зону" : "Rename Zone");
     } else { // 'castle'
-        renameModalTitleEl.textContent = translations[state.currentLang].renameModalTitle;
+        renameModalTitleEl.textContent = translations[state.currentLang]?.renameModalTitle ||
+                                           (state.currentLang === 'ru' ? "Переименовать замок" : "Rename Castle");
     }
     modal.style.display = 'block';
     renameInputEl.focus();
 }
 
-// --- Обновление элементов интерфейса ---
 
-/** Обновляет список размещенных зданий в соответствующей панели. */
-export function updateBuildingsList() {
-    const listContainer = document.getElementById('buildings-list');
-    listContainer.innerHTML = ''; // Очистка старого списка
+// --- Обновление динамических частей интерфейса ---
 
-    // Сортировка зданий: сначала альянсовые, потом замки/зоны по имени, затем остальные по типу
-    const sortedBuildings = [...state.buildings].sort((a, b) => {
-        const configA = buildingConfig[a.type];
-        const configB = buildingConfig[b.type];
+// ФУНКЦИЯ updateBuildingsList() БЫЛА УДАЛЕНА, так как список зданий как отдельная панель упразднен.
+// Информация о выделенном здании теперь управляется через updateSelectedBuildingToolbar.
 
-        // Альянсовые здания всегда сверху
-        if (configA.type === 'alliance' && configB.type !== 'alliance') return -1;
-        if (configA.type !== 'alliance' && configB.type === 'alliance') return 1;
-
-        // Замки и мертвые зоны сортируются по имени
-        const isSortableByNameA = a.type === 'castle' || a.type === 'deadzone';
-        const isSortableByNameB = b.type === 'castle' || b.type === 'deadzone';
-        if (isSortableByNameA && isSortableByNameB) {
-            return (a.playerName || '').localeCompare(b.playerName || '');
-        }
-        if (isSortableByNameA) return -1; // Замки/зоны выше остальных (не альянсовых)
-        if (isSortableByNameB) return 1;
-
-        // Сортировка остальных по локализованному имени типа
-        return (translations[state.currentLang][a.type] || a.type)
-               .localeCompare(translations[state.currentLang][b.type] || b.type);
-    });
-
-    sortedBuildings.forEach(building => {
-        const listItem = document.createElement('div');
-        listItem.className = 'list-item';
-        listItem.id = `list-item-${building.id}`;
-        if (state.selectedBuilding === building.id) {
-            listItem.classList.add('selected'); // Подсветка выделенного элемента
-        }
-
-        // Информация о здании (иконка, тип, имя)
-        const info = document.createElement('div');
-        info.innerHTML = `${building.icon} ${translations[state.currentLang][building.type] || building.type}`;
-        if ((building.type === 'castle' || building.type === 'deadzone') && building.playerName) {
-            info.innerHTML += `: ${building.playerName}`;
-        }
-
-        // Кнопки действий (переименовать, удалить)
-        const actions = document.createElement('div');
-        actions.className = 'list-item-actions'; // Добавлен класс для возможной стилизации
-
-        if (building.type === 'castle' || building.type === 'deadzone') {
-            const renameBtn = document.createElement('button');
-            renameBtn.textContent = translations[state.currentLang].rename;
-            renameBtn.addEventListener('click', (e) => {
-                e.stopPropagation(); // Предотвратить выделение элемента списка по клику на кнопку
-                showRenameModal(building.id);
-            });
-            actions.appendChild(renameBtn);
-        }
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.textContent = translations[state.currentLang].delete;
-        deleteBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            deleteBuilding(building.id); // Вызов функции из buildingManager
-        });
-        actions.appendChild(deleteBtn);
-
-        listItem.appendChild(info);
-        listItem.appendChild(actions);
-
-        // Выделение здания по клику на элемент списка (не на кнопки внутри него)
-        listItem.addEventListener('click', () => {
-            selectBuilding(building.id); // Вызов функции из buildingManager
-        });
-        listContainer.appendChild(listItem);
-    });
-}
-
-/** Обновляет текстовое содержимое элементов интерфейса в соответствии с текущим языком. */
+/** Обновляет все текстовые элементы интерфейса в соответствии с текущим выбранным языком. */
 export function updateLanguage() {
-    document.title = translations[state.currentLang].title; // Заголовок вкладки браузера
-    // Обновление всех элементов с атрибутом data-key
+    document.title = translations[state.currentLang]?.title || "Buildings Planner";
+
     document.querySelectorAll('[data-key]').forEach(el => {
-        const key = el.getAttribute('data-key');
-        if (translations[state.currentLang][key]) {
-            if (el.tagName === 'INPUT' && el.placeholder !== undefined) { // Для инпутов обновляем плейсхолдер
-                el.placeholder = translations[state.currentLang][key];
-            } else { // Для остальных элементов - textContent
-                el.textContent = translations[state.currentLang][key];
+        const key = el.dataset.key;
+        const translation = translations[state.currentLang]?.[key];
+        if (translation !== undefined) {
+            const textSpan = el.querySelector('.text'); // Для кнопок с иконкой и текстом
+            if (textSpan && (el.classList.contains('toolbar-action-btn') || el.classList.contains('sidebar-btn'))) {
+                textSpan.textContent = translation;
+            } else if (el.tagName === 'INPUT' && el.placeholder !== undefined) {
+                el.placeholder = translation;
+            } else {
+                el.textContent = translation;
             }
         }
     });
 
-    // Отдельно обновляем названия зданий в панели инструментов (т.к. они не имеют общего data-key для группы)
-    document.querySelectorAll('.toolbar .building-item .building-name').forEach(el => {
-        const buildingTypeKey = el.dataset.key; // Предполагаем, что data-key здесь - это тип здания
-        if (translations[state.currentLang][buildingTypeKey]) {
+    // Обновление названий зданий в десктопной панели инструментов
+    document.querySelectorAll('.toolbar.desktop-only .building-item .building-name').forEach(el => {
+        const buildingTypeKey = el.dataset.key;
+        if (buildingTypeKey && translations[state.currentLang]?.[buildingTypeKey]) {
             el.textContent = translations[state.currentLang][buildingTypeKey];
         }
     });
+    // На мобильных тултипы и aria-label обновляются в app.js -> populateMobileToolbarSlider
 
-    updateBuildingsList(); // Перерисовать список зданий с новыми локализованными именами
-    checkScreenSize();     // Применить адаптивные стили (например, скрытие текста на мобильных)
+    updateSelectedBuildingToolbar(); // Обновить текст на кнопках панели выделенного здания
+    updateRotateButtonVisualState(); // Обновить текст и состояние кнопок поворота
+    updateDistanceToHGButtonVisualState(); // Обновить состояние кнопок "До Врат"
 
-    // Обновляем визуальное состояние кнопок, зависящих от языка
-    updateRotateButtonVisualState();
-    // updateDistanceToHGButtonVisualState(); // Текст этой кнопки не меняется, только data-key и класс active
-
-    // Если активен режим отображения расстояний, нужно обновить текст на замках
     if (state.showDistanceToHG) {
-        updateCastleDistanceDisplay();
+        updateCastleDistanceDisplay(); // Обновить расстояния (единицы измерения могли измениться)
     }
+
+    checkScreenSize(); // Применить адаптивные стили
 }
 
 /** Обновляет отображение информации на замках (имя или расстояние до Адских Врат). */
 export function updateCastleDistanceDisplay() {
-    const hellGates = state.buildings.find(b => b.type === 'hellgates');
+    const hellGatesArray = state.buildings.filter(b => b.type === 'hellgates');
+    const hellGates = hellGatesArray.length > 0 ? hellGatesArray[0] : null;
 
     state.buildings.forEach(building => {
         if (building.type === 'castle') {
@@ -186,81 +137,129 @@ export function updateCastleDistanceDisplay() {
             if (!buildingEl) return;
 
             let nameEl = buildingEl.querySelector('.player-castle-name');
-            // Если элемент для имени еще не создан (например, замок был без имени), создаем его
-            if (!nameEl) {
+            if (!nameEl) { // Если элемента для имени нет, создаем его
                 nameEl = document.createElement('div');
                 nameEl.className = 'player-castle-name';
-                buildingEl.appendChild(nameEl); // Просто добавляем в конец, т.к. у замка нет явной иконки в DOM
+                buildingEl.appendChild(nameEl);
             }
 
-            if (state.showDistanceToHG) { // Если включен режим отображения расстояний
+            if (state.showDistanceToHG) {
                 if (hellGates) {
-                    // Расчет расстояния между центрами замка и Адских Врат
                     const castleCenterX = building.x + building.size / 2;
                     const castleCenterY = building.y + building.size / 2;
                     const hgCenterX = hellGates.x + hellGates.size / 2;
                     const hgCenterY = hellGates.y + hellGates.size / 2;
-
-                    const distance = Math.sqrt(
-                        Math.pow(castleCenterX - hgCenterX, 2) +
-                        Math.pow(castleCenterY - hgCenterY, 2)
-                    );
-                    // Отображаем расстояние с одной цифрой после запятой и единицей измерения
-                    nameEl.textContent = `${distance.toFixed(1)} ${translations[state.currentLang].distanceUnit}`;
+                    const distance = Math.sqrt(Math.pow(castleCenterX - hgCenterX, 2) + Math.pow(castleCenterY - hgCenterY, 2));
+                    // Только число без единиц измерения
+                    nameEl.textContent = distance.toFixed(1);
                 } else {
-                    // Если Адские Врата не размещены
-                    nameEl.textContent = translations[state.currentLang].hellgatesNotPlaced;
+                    nameEl.textContent = translations[state.currentLang]?.hellgatesNotPlaced || "HG not placed";
                 }
-            } else { // Если режим расстояний выключен, отображаем обычное имя замка
+            } else {
                 nameEl.textContent = building.playerName || '';
             }
         }
     });
 }
 
-/** Обновляет визуальное состояние кнопки поворота сетки (текст и класс 'active'). */
+/** Обновляет состояние и видимость панели инструментов для выделенного здания. */
+export function updateSelectedBuildingToolbar() {
+    const toolbar = document.getElementById('selectedBuildingToolbar');
+    const renameBtn = document.getElementById('renameSelectedBuildingBtn');
+    const deleteBtn = document.getElementById('deleteSelectedBuildingBtn');
+
+    if (!toolbar || !renameBtn || !deleteBtn) {
+        // Эта ошибка может возникать при самой первой инициализации, если DOM еще не полностью готов.
+        // console.warn("[uiManager] Элементы панели инструментов для выделенного здания не найдены.");
+        return;
+    }
+
+    const selectedBuildingObject = state.buildings.find(b => b.id === state.selectedBuilding);
+
+    if (selectedBuildingObject) {
+        // Показываем панель с плавной анимацией (через добавление класса)
+        toolbar.style.display = 'flex'; // Сначала делаем flex, чтобы размеры рассчитались
+        requestAnimationFrame(() => { // Затем добавляем класс для анимации появления
+            toolbar.classList.add('visible');
+        });
+
+        deleteBtn.disabled = false;
+
+        const canRename = selectedBuildingObject.type === 'castle' || selectedBuildingObject.type === 'deadzone';
+        renameBtn.disabled = !canRename;
+
+    } else { // Ничего не выделено
+        toolbar.classList.remove('visible');
+        // Можно добавить setTimeout перед установкой display:none, чтобы анимация успела отработать
+        // Но лучше управлять этим через CSS transition на opacity и pointer-events.
+        // Если display:none устанавливается сразу, transition на transform/opacity не сработает.
+        // Поэтому в CSS .selected-building-toolbar по умолчанию opacity:0, transform: translateY(10px), pointer-events: none
+        // А .visible делает opacity:1, transform: translateY(0), pointer-events: auto
+        // display:flex/none лучше использовать для полного скрытия/показа, если анимация не нужна при этом.
+        // Пока оставим как есть, CSS уже настроен на opacity/transform.
+        // display: none можно установить после завершения transition, если это важно для производительности.
+        // Для простоты, если невидима, то можно и display:none.
+        // toolbar.style.display = 'none'; // Скрываем панель (может прервать анимацию скрытия)
+
+        renameBtn.disabled = true;
+        deleteBtn.disabled = true;
+    }
+}
+
+/** Обновляет визуальное состояние (текст и класс 'active') для кнопок поворота сетки. */
 export function updateRotateButtonVisualState() {
-    const rotateButton = document.getElementById('rotateGridButton');
-    if (rotateButton) {
-        const key = state.isGridRotated ? 'resetRotation' : 'rotateGrid';
-        // Обновляем текст кнопки в соответствии с текущим состоянием и языком
-        rotateButton.textContent = translations[state.currentLang][key] || key;
-        rotateButton.classList.toggle('active', state.isGridRotated);
-    }
+    const ids = ['rotateGridButtonDesktop', 'rotateGridButtonMobile'];
+    const currentKey = state.isGridRotated ? 'resetRotation' : 'rotateGrid';
+    const text = translations[state.currentLang]?.[currentKey] || currentKey;
+
+    ids.forEach(id => {
+        const button = document.getElementById(id);
+        if (button) {
+            // Для кнопок, где текст внутри .text (если это общая кнопка control-btn)
+            const textSpan = button.querySelector('.text');
+            if (textSpan) {
+                textSpan.textContent = text;
+            } else {
+                button.textContent = text;
+            }
+            button.classList.toggle('active', state.isGridRotated);
+        }
+    });
 }
 
-/** Обновляет визуальное состояние кнопки режима "До Адских Врат" (класс 'active'). */
+/** Обновляет визуальное состояние (класс 'active') для кнопок режима "До Адских Врат". */
 export function updateDistanceToHGButtonVisualState() {
-    const distanceButton = document.getElementById('distanceToHGButton');
-    if (distanceButton) {
-        distanceButton.classList.toggle('active', state.showDistanceToHG);
-    }
+    const ids = ['distanceToHGButtonDesktop', 'distanceToHGButtonMobile'];
+    ids.forEach(id => {
+        const button = document.getElementById(id);
+        if (button) {
+            button.classList.toggle('active', state.showDistanceToHG);
+            // Текст этих кнопок управляется data-key при вызове updateLanguage
+        }
+    });
 }
 
-/**
- * Адаптирует интерфейс под размер экрана (например, для мобильных устройств).
- * Скрывает/показывает текстовые названия зданий в панели инструментов.
- */
+/** Адаптирует интерфейс под текущий размер экрана. */
 export function checkScreenSize() {
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
-    document.body.classList.toggle('mobile-view', isMobile); // Добавляем/удаляем класс для body
+    document.body.classList.toggle('mobile-view', isMobile);
 
-    // Адаптация отображения имен зданий в тулбаре
-    document.querySelectorAll('.toolbar .building-item .building-name').forEach(nameEl => {
-        const key = nameEl.dataset.key; // Тип здания из data-key
+    // Обновление отображения текста на кнопках панели выделенного здания
+    // в зависимости от того, мобильный вид или нет (скрыть/показать .text).
+    // Это делается через CSS (.mobile-view .selected-building-toolbar .text { display: none; }),
+    // поэтому здесь дополнительных действий не требуется, кроме установки .mobile-view на body.
+
+    // Логика скрытия/показа названий в ДЕСКТОПНОМ тулбаре (если он все еще виден на узких экранах)
+    document.querySelectorAll('.toolbar.desktop-only .building-item .building-name').forEach(nameEl => {
         if (isMobile) {
-            // На мобильных устройствах имя обычно скрывается через CSS,
-            // но здесь можно сохранить оригинальный текст, если он будет показан в другом месте (например, tooltip)
-            if (!nameEl.dataset.originalText && translations[state.currentLang][key]) {
-                nameEl.dataset.originalText = translations[state.currentLang][key];
-            }
-            // CSS: .mobile-view .toolbar .building-item .building-name { display: none; }
+            // На мобильном этот тулбар (.desktop-only) должен быть скрыт через CSS.
+            // Эта логика здесь на всякий случай, если CSS не отработает.
+            nameEl.style.display = 'none';
         } else {
-            // На десктопе восстанавливаем текст (если он был изменен или скрыт)
-            if (nameEl.dataset.originalText) {
-                nameEl.textContent = nameEl.dataset.originalText;
-            } else if (translations[state.currentLang][key]) {
-                nameEl.textContent = translations[state.currentLang][key];
+            nameEl.style.display = ''; // Восстанавливаем отображение
+            const key = nameEl.dataset.key;
+            if (key && translations[state.currentLang]?.[key]) {
+                nameEl.textContent = translations[state.currentLang][key]; // Обновляем текст на случай смены языка
             }
         }
     });

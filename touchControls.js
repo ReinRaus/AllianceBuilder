@@ -1,132 +1,182 @@
-import * as state from './state.js';
-import { setupGrid, redrawAllBuildings } from './gridUtils.js';
-import { selectBuilding, checkOverlap, updateBuilding } from './buildingManager.js';
-// POTENTIAL_ISSUE: updateCastleDistanceDisplay не импортирован, но может понадобиться при перемещении.
+// touchControls.js
+// Этот модуль отвечает за реализацию сенсорного управления для элементов на сетке,
+// таких как перемещение уже размещенных зданий и масштабирование сетки щипком (pinch-to-zoom).
 
-// --- Сенсорное управление для отдельных зданий ---
+import * as state from './state.js'; // Глобальное состояние (gridSize, cellSize, isMobileDragging и т.д.)
+import { setupGrid, redrawAllBuildings } from './gridUtils.js'; // Для обновления сетки при масштабировании
+import { selectBuilding, checkOverlap, updateBuilding } from './buildingManager.js'; // Управление объектами зданий
+import { updateRotateButtonVisualState, updateCastleDistanceDisplay } from './uiManager.js'; // Обновление UI
+
+// --- Сенсорное управление для отдельных зданий (перемещение) ---
 
 /**
- * Добавляет обработчики сенсорных событий для перемещения размещенного здания.
- * @param {HTMLElement} buildingEl DOM-элемент здания.
- * @param {Object} building Объект здания из state.buildings.
+ * Добавляет обработчики сенсорных событий (`touchstart`, `touchmove`, `touchend`)
+ * к DOM-элементу здания для реализации его перемещения по сетке.
+ * @param {HTMLElement} buildingEl - DOM-элемент здания, к которому привязываются обработчики.
+ * @param {Object} building - Объект здания из `state.buildings`, соответствующий этому DOM-элементу.
  */
 export function addTouchHandlersToBuilding(buildingEl, building) {
     buildingEl.addEventListener('touchstart', (eStart) => {
-        if (eStart.touches.length === 1) { // Только одно касание для перемещения
-            if (state.isGridRotated) { // Сброс поворота сетки перед началом перетаскивания
-                state.setIsGridRotated(false);
-                document.querySelector('.grid-container').classList.remove('rotated');
-                // POTENTIAL_ISSUE: Нужно вызвать updateRotateButtonVisualState() из uiManager.
-            }
-            selectBuilding(building.id);
+        // Игнорируем начало перемещения существующего здания, если в данный момент
+        // активно перетаскивание НОВОГО здания с мобильной панели инструментов.
+        if (state.isMobileDragging) return;
 
-            const touchStart = eStart.touches[0];
+        // Реагируем только на одно касание (перемещение одним пальцем)
+        if (eStart.touches.length === 1) {
+            // Если сетка повернута, сбрасываем поворот перед началом взаимодействия
+            if (state.isGridRotated) {
+                state.setIsGridRotated(false);
+                document.querySelector('.grid-container')?.classList.remove('rotated');
+                updateRotateButtonVisualState(); // Обновляем состояние кнопки поворота
+            }
+
+            selectBuilding(building.id); // Выделяем здание, которое начали перемещать
+
+            const touchStart = eStart.touches[0]; // Данные первого касания
+            // Начальные координаты для расчета смещения
             const startTouchX = touchStart.clientX;
             const startTouchY = touchStart.clientY;
-            const startBuildingX = building.x;
+            const startBuildingX = building.x; // Начальная позиция здания на сетке (в ячейках)
             const startBuildingY = building.y;
+            // Текущие размеры здания (учитывая кастомные для deadzone)
             const currentBuildingWidth = building.width || building.size;
             const currentBuildingHeight = building.height || building.size;
-            let moved = false;
+            let moved = false; // Флаг, указывающий, было ли реальное перемещение
 
+            // Обработчик перемещения пальца
             const handleTouchMove = (eMove) => {
-                if (eMove.touches.length !== 1) return; // Игнорировать, если изменилось кол-во пальцев
-                eMove.preventDefault(); // Предотвратить скролл страницы при перетаскивании здания
+                // Если изменилось количество касаний (например, начался pinch-zoom) или активен D&D с панели, прекращаем обработку
+                if (eMove.touches.length !== 1 || state.isMobileDragging) {
+                    cleanUpTouchMove();
+                    return;
+                }
+                eMove.preventDefault(); // Предотвращаем стандартный скролл страницы при перетаскивании здания
 
                 const touchMove = eMove.touches[0];
+                // Расчет смещения в ячейках сетки, округление до ближайшей целой ячейки
                 const deltaXGrid = Math.round((touchMove.clientX - startTouchX) / state.cellSize);
                 const deltaYGrid = Math.round((touchMove.clientY - startTouchY) / state.cellSize);
 
-                if (deltaXGrid !==0 || deltaYGrid !==0) moved = true;
+                if (deltaXGrid !== 0 || deltaYGrid !== 0) moved = true; // Фиксируем, что было движение
 
+                // Расчет новых координат с учетом границ сетки
                 const newX = Math.max(0, Math.min(state.gridSize - currentBuildingWidth, startBuildingX + deltaXGrid));
                 const newY = Math.max(0, Math.min(state.gridSize - currentBuildingHeight, startBuildingY + deltaYGrid));
 
-                // Временное удаление для проверки перекрытия
-                const index = state.buildings.findIndex(b => b.id === building.id);
-                const tempBuilding = state.buildings.splice(index, 1)[0];
+                // Временно удаляем текущее здание из массива для корректной проверки перекрытия с остальными
+                const originalIndex = state.buildings.findIndex(b => b.id === building.id);
+                if (originalIndex === -1) { cleanUpTouchMove(); return; } // Безопасность
+                const tempBuildingData = state.buildings.splice(originalIndex, 1)[0];
 
                 if (!checkOverlap(newX, newY, currentBuildingWidth, currentBuildingHeight)) {
-                    building.x = newX;
+                    building.x = newX; // Обновляем координаты в объекте здания
                     building.y = newY;
-                    updateBuilding(building); // Обновление DOM
+                    updateBuilding(building); // Обновляем DOM-представление здания
                 }
-                state.buildings.splice(index, 0, tempBuilding); // Возврат в массив
+                state.buildings.splice(originalIndex, 0, tempBuildingData); // Возвращаем здание в массив
             };
 
+            // Обработчик завершения касания (палец поднят)
             const handleTouchEnd = () => {
+                cleanUpTouchMove();
+                // Если здание было действительно перемещено и активен режим отображения расстояний
+                if (moved && state.showDistanceToHG && (building.type === 'castle' || building.type === 'hellgates')) {
+                    updateCastleDistanceDisplay(); // Обновляем отображаемые расстояния
+                }
+            };
+            
+            // Вспомогательная функция для удаления слушателей
+            const cleanUpTouchMove = () => {
                 document.removeEventListener('touchmove', handleTouchMove);
                 document.removeEventListener('touchend', handleTouchEnd);
-                 // Если здание было перемещено и активен режим расстояний
-                if (moved && state.showDistanceToHG && (building.type === 'castle' || building.type === 'hellgates')) {
-                    // POTENTIAL_ISSUE: updateCastleDistanceDisplay не импортирована здесь.
-                    // uiManager.updateCastleDistanceDisplay(); // Пример, если бы она была импортирована
-                }
+                document.removeEventListener('touchcancel', handleTouchEnd); // Также для системной отмены
             };
 
-            document.addEventListener('touchmove', handleTouchMove, { passive: false });
+            // Добавляем слушатели на документ для отслеживания движения и отпускания пальца
+            document.addEventListener('touchmove', handleTouchMove, { passive: false }); // passive:false для preventDefault
             document.addEventListener('touchend', handleTouchEnd);
+            document.addEventListener('touchcancel', handleTouchEnd); // Обработка системной отмены жеста
         }
-    }, { passive: true }); // passive:true для touchstart, чтобы не блокировать pinch-zoom, если он на том же элементе
+    }, { passive: true }); // passive:true для 'touchstart' здесь допустимо, т.к. e.preventDefault()
+                           // вызывается внутри 'touchmove', если это действительно перетаскивание.
+                           // Это позволяет другим жестам (например, pinch-zoom на контейнере) начаться,
+                           // если пользователь не начал сразу двигать здание.
 }
 
-// --- Сенсорное управление для сетки (масштабирование) ---
 
-/** Инициализирует масштабирование сетки щипком (pinch-to-zoom). */
+// --- Сенсорное управление для сетки (масштабирование щипком) ---
+
+/**
+ * Инициализирует функциональность масштабирования сетки с помощью жеста "щипок" (pinch-to-zoom)
+ * на элементе-контейнере сетки.
+ */
 export function setupTouchPinchZoom() {
     const gridContainer = document.querySelector('.grid-container');
-    if (!gridContainer) return;
+    if (!gridContainer) {
+        console.error("[touchControls] Контейнер .grid-container не найден для pinch-zoom.");
+        return;
+    }
 
-    let initialDistance = 0;
-    let initialCellSize = state.cellSize;
-    let pinchTimeout; // Для дебаунсинга перерисовки
+    let initialPinchDistance = 0; // Начальное расстояние между пальцами
+    let initialCellSizeForPinch = state.cellSize; // Начальный размер ячейки при начале жеста
+    let pinchRedrawTimeout;       // ID таймаута для дебаунсинга перерисовки сетки
 
     gridContainer.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 2) { // Если два пальца на экране
-            e.preventDefault(); // Предотвратить стандартные действия (например, масштабирование страницы)
-            initialDistance = Math.hypot( // Расстояние между пальцами
+        // Если сейчас идет перетаскивание здания с панели, не начинаем pinch-zoom
+        if (state.isMobileDragging) return;
+        // Начинаем отслеживать жест, если на экране два активных касания
+        if (e.touches.length === 2) {
+            e.preventDefault(); // Предотвращаем стандартное масштабирование страницы браузером
+            // Расчет начального расстояния между двумя точками касания
+            initialPinchDistance = Math.hypot(
                 e.touches[0].clientX - e.touches[1].clientX,
                 e.touches[0].clientY - e.touches[1].clientY
             );
-            initialCellSize = state.cellSize; // Запоминаем начальный размер ячейки
+            initialCellSizeForPinch = state.cellSize; // Запоминаем текущий размер ячейки
         }
-    }, { passive: false }); // passive:false, чтобы работал preventDefault
+    }, { passive: false }); // passive:false для возможности вызова preventDefault
 
     gridContainer.addEventListener('touchmove', (e) => {
-        if (e.touches.length === 2) { // Если два пальца двигаются
-            e.preventDefault();
-            const currentDistance = Math.hypot(
+        if (state.isMobileDragging) return; // Игнорируем, если идет D&D с панели
+        // Продолжаем обработку, если на экране все еще два активных касания
+        if (e.touches.length === 2) {
+            e.preventDefault(); // Предотвращаем скролл/зум страницы во время жеста
+            const currentPinchDistance = Math.hypot(
                 e.touches[0].clientX - e.touches[1].clientX,
                 e.touches[0].clientY - e.touches[1].clientY
             );
 
-            if (initialDistance > 0) { // Убедимся, что начальное расстояние было установлено
-                const scaleFactor = currentDistance / initialDistance; // Коэффициент масштабирования
-                let newCellSize = initialCellSize * scaleFactor;
-                // Ограничение минимального и максимального размера ячейки
-                newCellSize = Math.max(8, Math.min(40, newCellSize));
+            if (initialPinchDistance > 0) { // Убедимся, что начальное расстояние было корректно установлено
+                const scaleFactor = currentPinchDistance / initialPinchDistance; // Коэффициент масштабирования
+                let newCellSize = initialCellSizeForPinch * scaleFactor;
+                
+                // Ограничиваем минимальный и максимальный размер ячейки для удобства и производительности
+                newCellSize = Math.max(10, Math.min(60, newCellSize)); // Например, от 10px до 60px
 
-                // Обновляем размер ячейки и перерисовываем сетку, если изменение существенное
-                if (Math.abs(newCellSize - state.cellSize) > 0.5) { // Порог для обновления
+                // Обновляем размер ячейки и перерисовываем сетку, если изменение достаточно значительное
+                if (Math.abs(newCellSize - state.cellSize) > 0.5) { // Порог чувствительности
                     state.setCellSize(newCellSize);
 
-                    // Дебаунсинг, чтобы не перерисовывать слишком часто во время движения пальцев
-                    clearTimeout(pinchTimeout);
-                    pinchTimeout = setTimeout(() => {
-                        setupGrid();          // Обновить структуру сетки (размеры ячеек)
+                    // Дебаунсинг перерисовки: обновляем сетку не на каждое микро-движение,
+                    // а с небольшой задержкой после последнего изменения.
+                    clearTimeout(pinchRedrawTimeout);
+                    pinchRedrawTimeout = setTimeout(() => {
+                        setupGrid();          // Обновить HTML-структуру сетки с новым cellSize
                         redrawAllBuildings(); // Перерисовать все здания с новым cellSize
-                    }, 50); // Задержка в миллисекундах
+                    }, 50); // Задержка в мс
                 }
             }
         }
     }, { passive: false });
-}
 
-/**
- * Заглушка для реализации перетаскивания зданий с панели инструментов на сенсорных устройствах.
- * Требует более сложной логики эмуляции drag-and-drop.
- */
-export function setupTouchDragAndDrop() {
-    // POTENTIAL_ISSUE: Данная функциональность не реализована.
-    console.warn("setupTouchDragAndDrop: Touch drag-and-drop from toolbar is not yet fully implemented.");
+    // Сброс initialPinchDistance, если количество пальцев изменилось (например, один палец убран)
+    // Это предотвратит некорректный расчет scaleFactor при последующих жестах.
+    gridContainer.addEventListener('touchend', (e) => {
+        if (e.touches.length < 2) {
+            initialPinchDistance = 0;
+        }
+    });
+    gridContainer.addEventListener('touchcancel', (e) => {
+         initialPinchDistance = 0;
+    });
 }
