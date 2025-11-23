@@ -14,7 +14,7 @@
         <div class="sidebar-section" id="sidebarControls">
             <h4 data-key="controlsHeader">Управление</h4>
             <button id="shareButtonMobile" class="sidebar-btn control-btn" data-key="shareLink">Поделиться</button>
-            <div class="sidebar-grid-controls">
+            <div class="sidebar-grid-controls" style="display: none;">
                 <label id="gridSizeLabelMobile" for="gridSizeInputMobile" data-key="gridSizeLabel">Размер сетки:</label>
                 <input type="number" id="gridSizeInputMobile" class="grid-size-input" min="10" max="100" value="50"/>
                 <button id="applyGridSizeMobile" class="sidebar-btn" data-key="apply">Применить</button>
@@ -40,13 +40,16 @@
             <h1 id="title" data-key="title">Планировщик зданий альянса</h1>
             <div class="header-controls desktop-only">
                 <button id="shareButtonDesktop" class="header-btn" data-key="shareLink">Поделиться ссылкой</button>
-                <label id="gridSizeLabelDesktop" for="gridSizeInputDesktop" data-key="gridSizeLabel">Размер сетки:</label>
-                <input type="number" id="gridSizeInputDesktop" class="grid-size-input" min="10" max="100" value="50"/>
-                <button id="applyGridSizeDesktop" data-key="apply">Применить</button>
+                <label id="gridSizeLabelDesktop" for="gridSizeInputDesktop" data-key="gridSizeLabel" style="display: none;">Размер сетки:</label>
+                <input type="number" id="gridSizeInputDesktop" class="grid-size-input" min="10" max="100" value="50" style="display: none;"/>
+                <button id="applyGridSizeDesktop" data-key="apply" style="display: none;">Применить</button>
             </div>
             <div class="view-actions desktop-only">
                 <button id="rotateGridButtonDesktop" class="control-btn" data-key="rotateGrid">Повернуть сетку</button>
                 <button id="distanceToHGButtonDesktop" class="control-btn" data-key="distanceToHGLabel">До Адских Врат</button>
+                <div id="averageDistanceDisplay" class="average-distance-display">
+                    <span data-key="averageDistance">Среднее</span>: <span id="averageDistanceValue">—</span>
+                </div>
             </div>
             <div class="language-switcher desktop-only">
                 <button class="language-btn" data-lang="en">EN</button>

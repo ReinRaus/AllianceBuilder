@@ -94,6 +94,8 @@ export function updateLanguage() {
     document.querySelectorAll('[data-key]').forEach(el => {
         const key = el.dataset.key;
         const translation = translations[state.currentLang]?.[key];
+        if(key=="averageDistance") console.log(state.currentLang);
+        
         if (translation !== undefined) {
             const textSpan = el.querySelector('.text'); // Для кнопок с иконкой и текстом
             if (textSpan && (el.classList.contains('toolbar-action-btn') || el.classList.contains('sidebar-btn'))) {
@@ -122,6 +124,8 @@ export function updateLanguage() {
     if (state.showDistanceToHG) {
         updateCastleDistanceDisplay(); // Обновить расстояния (единицы измерения могли измениться)
     }
+
+    updateAverageDistanceDisplay(); // Обновить отображение среднего расстояния
 
     checkScreenSize(); // Применить адаптивные стили
 }
@@ -183,25 +187,37 @@ export function updateSelectedBuildingToolbar() {
             toolbar.classList.add('visible');
         });
 
+        // Всегда показываем кнопку удаления для выделенного здания
+        deleteBtn.style.display = '';
         deleteBtn.disabled = false;
 
+        // Кнопка "Переименовать" должна исчезать полностью, если для данного типа здания
+        // переименование не поддерживается (например, не castle и не deadzone).
         const canRename = selectedBuildingObject.type === 'castle' || selectedBuildingObject.type === 'deadzone';
-        renameBtn.disabled = !canRename;
+        if (canRename) {
+            renameBtn.style.display = '';
+            renameBtn.disabled = false;
+        } else {
+            // Скрываем кнопку вместо того чтобы просто дизейблить её
+            renameBtn.style.display = 'none';
+            renameBtn.disabled = true;
+        }
 
     } else { // Ничего не выделено
         toolbar.classList.remove('visible');
-        // Можно добавить setTimeout перед установкой display:none, чтобы анимация успела отработать
-        // Но лучше управлять этим через CSS transition на opacity и pointer-events.
-        // Если display:none устанавливается сразу, transition на transform/opacity не сработает.
-        // Поэтому в CSS .selected-building-toolbar по умолчанию opacity:0, transform: translateY(10px), pointer-events: none
-        // А .visible делает opacity:1, transform: translateY(0), pointer-events: auto
-        // display:flex/none лучше использовать для полного скрытия/показа, если анимация не нужна при этом.
-        // Пока оставим как есть, CSS уже настроен на opacity/transform.
-        // display: none можно установить после завершения transition, если это важно для производительности.
-        // Для простоты, если невидима, то можно и display:none.
-        // toolbar.style.display = 'none'; // Скрываем панель (может прервать анимацию скрытия)
+        // Устанавливаем display:none после завершения CSS transition для правильного скрытия
+        // и предотвращения перехвата событий невидимым элементом.
+        // CSS transition длится ~0.2s (как указано в styles.css: transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out)
+        setTimeout(() => {
+            if (!toolbar.classList.contains('visible')) {
+                toolbar.style.display = 'none';
+            }
+        }, 250);
 
+        // Скрываем/деактивируем кнопки когда ничего не выделено
+        renameBtn.style.display = 'none';
         renameBtn.disabled = true;
+        deleteBtn.style.display = '';
         deleteBtn.disabled = true;
     }
 }
@@ -237,6 +253,37 @@ export function updateDistanceToHGButtonVisualState() {
             // Текст этих кнопок управляется data-key при вызове updateLanguage
         }
     });
+}
+
+/** Обновляет отображение среднего расстояния от всех замков до адских врат. */
+export function updateAverageDistanceDisplay() {
+    const display = document.getElementById('averageDistanceDisplay');
+    const valueEl = document.getElementById('averageDistanceValue');
+    
+    if (!display || !valueEl) return;
+
+    const castles = state.buildings.filter(b => b.type === 'castle');
+    const hellGatesArray = state.buildings.filter(b => b.type === 'hellgates');
+    const hellGates = hellGatesArray.length > 0 ? hellGatesArray[0] : null;
+
+    // Дисплей всегда видим, но показываем тире если нет данных
+    if (castles.length > 0 && hellGates) {
+        let totalDistance = 0;
+        castles.forEach(castle => {
+            const castleCenterX = castle.x + castle.size / 2;
+            const castleCenterY = castle.y + castle.size / 2;
+            const hgCenterX = hellGates.x + hellGates.size / 2;
+            const hgCenterY = hellGates.y + hellGates.size / 2;
+            const distance = Math.sqrt(Math.pow(castleCenterX - hgCenterX, 2) + Math.pow(castleCenterY - hgCenterY, 2));
+            totalDistance += distance;
+        });
+
+        const averageDistance = totalDistance / castles.length;
+        valueEl.textContent = `${averageDistance.toFixed(1)} / ${castles.length}`;
+    } else {
+        // Если нет замков или адских врат, показываем длинное тире
+        valueEl.textContent = '—';
+    }
 }
 
 /** Адаптирует интерфейс под текущий размер экрана. */

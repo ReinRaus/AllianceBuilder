@@ -314,8 +314,9 @@ export function setupDragAndDrop() {
             } else {
                 createBuilding(type, x, y);
             }
+            removeFullGhostFromGrid(); // Явно удаляем призраки после успешного размещения
         } else {
-             alert(translations[state.currentLang]?.cannotOverlapMsg || "Cannot place building here.");
+            alert(translations[state.currentLang]?.cannotOverlapMsg || "Cannot place building here.");
         }
         // Призраки (#cursor-ghost-icon и #full-ghost-building) будут убраны в 'dragend'
     });

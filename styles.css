@@ -97,6 +97,26 @@ header h1 { margin: 0; font-size: 1.2em; font-weight: 500; white-space: nowrap; 
 }
 .hamburger-btn { padding: 8px 10px; font-size: 1.6em; background: none; border: none; color: var(--text-color-light); }
 
+/* --- Average Distance Display --- */
+.average-distance-display {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 0.25rem;
+    color: var(--text-color-light);
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+#averageDistanceValue {
+    font-weight: 500;
+    display: inline-block;
+    width: 70px;
+    text-align: center;
+}
+
 /* --- Мобильный слайдер инструментов --- */
 .mobile-tool-slider { /* #mobileToolbarSlider */
     height: var(--mobile-slider-height); background-color: var(--background-light);
@@ -106,7 +126,7 @@ header h1 { margin: 0; font-size: 1.2em; font-weight: 500; white-space: nowrap; 
 .slider-content { display: flex; align-items: center; padding: 0 8px; gap: 6px; }
 .tool-slider-item {
     display: inline-flex; justify-content: center; align-items: center;
-    width: 44px; height: 44px; padding: 0; font-size: 1.2em; border-radius: 5px;
+    width: 44px; height: 44px; padding: 0; font-size: 1.5em; border-radius: 5px;
     background-color: #fff; border: 1px solid var(--border-color); flex-shrink: 0;
 }
 .tool-slider-item .icon { line-height: 1; }
@@ -123,16 +143,18 @@ header h1 { margin: 0; font-size: 1.2em; font-weight: 500; white-space: nowrap; 
 .toolbar { /* #toolbarDesktop */
     width: 240px; padding: 20px; background-color: var(--background-light);
     border-right: 1px solid var(--border-color); overflow-y: auto; flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
 }
-.toolbar h2 { margin-top: 0; margin-bottom: 18px; font-size: 1.15em; font-weight: 600; color: #343a40; }
-.building-item { display: flex; align-items: center; gap: 10px; padding: 10px; margin-bottom: 8px; background-color: #fff; border: 1px solid var(--border-color); border-radius: 0.25rem; cursor: grab; transition: background-color 0.1s ease, box-shadow 0.1s ease; }
+.toolbar h2 { margin-top: 0; margin-bottom: 18px; font-size: 1.15em; font-weight: 600; color: #343a40; flex-shrink: 0; }
+.building-item { display: flex; align-items: center; gap: 10px; padding: 10px; margin-bottom: 8px; background-color: #fff; border: 1px solid var(--border-color); border-radius: 0.25rem; cursor: grab; transition: background-color 0.1s ease, box-shadow 0.1s ease; flex-shrink: 0; }
 .building-item:hover { background-color: #f1f3f5; box-shadow: 0 0 5px rgba(0,0,0,0.05); }
-.building-item .icon { font-size: 1.6em; color: #495057; }
+.building-item .icon { font-size: 2em; color: #495057; }
 .building-item .building-name { font-size: 0.875em; color: #212529; }
 .building-item.dragging { cursor: grabbing; }
 .building-item.dragging-source-transparent { opacity: 0.25 !important; }
-.shift-controls { display: flex; justify-content: space-between; margin-top: auto; padding: 8px 5px; background-color: #e9ecef; border: 1px solid var(--border-color); border-radius: 0.25rem; }
-.shift-btn { flex-grow: 1; margin: 0 2px; padding: 8px 0; font-size: 1.3em; font-weight: bold; background-color: #fff; border: 1px solid #adb5bd; }
+.shift-controls { display: flex; justify-content: space-between; gap: 4px; margin-top: auto; padding: 8px 0; background-color: transparent; border: none; border-radius: 0; flex-shrink: 0; width: 100%; }
+.shift-btn { flex: 1; padding: 10px 4px; font-size: 1.3em; font-weight: bold; background-color: #fff; border: 1px solid #adb5bd; }
 .shift-btn:hover { background-color: #f1f3f5; }
 
 /* --- Сетка и ее контейнер --- */
@@ -151,10 +173,30 @@ header h1 { margin: 0; font-size: 1.2em; font-weight: 500; white-space: nowrap; 
 
 /* --- Размещенные здания на сетке --- */
 .building { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; background-color: rgba(255, 255, 255, 0.92); border: 1px solid #5a6268; user-select: none; cursor: move; z-index: 10; border-radius: 2px; transition: border-color 0.15s, box-shadow 0.15s; }
-.building .icon { font-size: 1.5em; line-height: 1; margin-bottom: 1px; }
+.building .icon { font-size: 2em; line-height: 1; margin-bottom: 1px; }
 .building.selected { border-color: var(--primary-action-color); box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.35); z-index: 11; }
 .building-area { position: absolute; background-color: var(--alliance-color); pointer-events: none; z-index: 5; border-radius: 2px; }
-.player-castle-name, .deadzone-name { box-sizing: border-box; width: calc(100% - 2px); position: absolute; bottom: 1px; left: 1px; padding: 1px 2px; font-size: 9px; line-height: 1.15; text-align: center; color: #333; background-color: rgba(255, 255, 255, 0.8); border-radius: 1px; overflow-wrap: break-word; word-break: break-word; }
+.player-castle-name, .deadzone-name {
+    box-sizing: border-box;
+    /* Занимаем почти всю площадь здания с небольшими отступами */
+    position: absolute;
+    inset: 4px; /* top right bottom left отступы */
+    padding: 6px;
+    /* Начальный размер шрифта — JS может подстроить выше при необходимости */
+    font-size: 14px;
+    line-height: 1.2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #333;
+    background-color: rgba(255, 255, 255, 0.85);
+    border-radius: 2px;
+    overflow: hidden; /* Скрываем переполнение — размер шрифта будет подстраиваться */
+    word-break: break-word;
+    white-space: normal; /* Разрешаем переносы строк */
+}
 .resize-handle { position: absolute; bottom: -2px; right: -2px; width: 10px; height: 10px; background-color: var(--primary-action-color); border: 1px solid var(--text-color-light); border-radius: 50%; cursor: nwse-resize; z-index: 12; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
 
 /* --- Призраки --- */
@@ -162,7 +204,7 @@ header h1 { margin: 0; font-size: 1.2em; font-weight: 500; white-space: nowrap; 
 .ghost-building .icon { opacity: 0.75; }
 .ghost-building.invalid-position { border-color: #dc3545; background-color: rgba(220, 53, 69, 0.15); }
 .ghost-area { opacity: 0.3; pointer-events: none; border: 1px dashed var(--alliance-color); }
-#cursor-ghost-icon { position: fixed; padding: 3px 6px; font-size: 1.5em; color: var(--text-color-dark); background-color: rgba(255, 255, 255, 0.88); border-radius: 3px; box-shadow: 0 1px 4px rgba(0,0,0,0.2); pointer-events: none; z-index: 2000; }
+#cursor-ghost-icon { position: fixed; padding: 3px 6px; font-size: 1.8em; color: var(--text-color-dark); background-color: rgba(255, 255, 255, 0.88); border-radius: 3px; box-shadow: 0 1px 4px rgba(0,0,0,0.2); pointer-events: none; z-index: 2000; }
 #mobile-placement-ghost { position: fixed; padding: 5px 8px; font-size: 1.8em; color: var(--text-color-dark); background-color: rgba(235, 235, 235, 0.9); border: 1px solid rgba(0,0,0,0.15); border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.25); pointer-events: none; z-index: 2000; display: none; }
 
 /* --- Панель списка зданий (десктоп) - СТИЛИ УДАЛЕНЫ, Т.К. ПАНЕЛЬ УДАЛЕНА --- */
@@ -220,7 +262,7 @@ header h1 { margin: 0; font-size: 1.2em; font-weight: 500; white-space: nowrap; 
     line-height: 1;
 }
 .toolbar-action-btn .text {
-    /* Стили для текста, если нужны (например, скрыть на мобильных) */
+    white-space: nowrap;
 }
 
 
@@ -273,7 +315,7 @@ header h1 { margin: 0; font-size: 1.2em; font-weight: 500; white-space: nowrap; 
 
 /* --- Правила для переключения видимости на мобильных/десктопных версиях --- */
 body:not(.mobile-view) .desktop-only {
-    /* display должен соответствовать типу элемента */
+    display: flex;
 }
 body:not(.mobile-view) .mobile-only { display: none !important; }
 
