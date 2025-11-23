@@ -40,6 +40,7 @@ export const translations = {
         rotateGrid: "Повернуть сетку",
         resetRotation: "Сбросить поворот",
         distanceToHGLabel: "До Адских Врат",
+        averageDistance: "Среднее расстояние",
         hellgatesNotPlaced: "Врата не размещены", // Сообщение, если Адские Врата не на сетке
         cannotShiftFurther: "Невозможно сдвинуть здания дальше.", // Сообщение при попытке сдвинуть за пределы
         limitReached: "лимит достигнут",       // Общее сообщение о достижении лимита (добавляется к типу здания)
@@ -85,6 +86,7 @@ export const translations = {
         rotateGrid: "Rotate Grid",
         resetRotation: "Reset Rotation",
         distanceToHGLabel: "To Hell Gates",
+        averageDistance: "Average Distance",
         hellgatesNotPlaced: "Gates not placed",
         cannotShiftFurther: "Cannot shift buildings further.",
         limitReached: "limit reached",
@@ -129,6 +131,7 @@ export const translations = {
         rotateGrid: "Girar Grade",
         resetRotation: "Resetar Rotação",
         distanceToHGLabel: "Aos Portões Infernais",
+        averageDistance: "Distância Média",
         hellgatesNotPlaced: "Portões não colocados",
         cannotShiftFurther: "Não é possível mover mais as construções.",
         limitReached: "limite atingido",
@@ -173,6 +176,7 @@ export const translations = {
         rotateGrid: "Raster drehen",
         resetRotation: "Drehung zurücksetzen",
         distanceToHGLabel: "Zu den Höllentoren",
+        averageDistance: "Durchschnittsentfernung",
         hellgatesNotPlaced: "Tore nicht platziert",
         cannotShiftFurther: "Gebäude können nicht weiter verschoben werden.",
         limitReached: "Limit erreicht",

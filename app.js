@@ -21,8 +21,9 @@ import {
 } from './dragDrop.js';
 import {
     updateLanguage, checkScreenSize, updateCastleDistanceDisplay,
+    updateAverageDistanceDisplay,
     updateRotateButtonVisualState, updateDistanceToHGButtonVisualState,
-    showPlayerNameModal, showRenameModal, updateSelectedBuildingToolbar
+    showPlayerNameModal, showRenameModal, updateSelectedBuildingToolbar,
 } from './uiManager.js';
 import { saveStateToBase64, checkLocationHash } from './persistence.js';
 import { setupTouchPinchZoom } from './touchControls.js'; // addTouchHandlersToBuilding больше не нужен здесь, он в buildingManager
@@ -33,9 +34,15 @@ let isSidebarOpen = false;
 // Переменные для хранения ссылок на обработчики событий мобильного D&D
 let currentMobileToolType = null; // Тип здания, выбранного на мобильной панели
 let activeMobileToolButton = null; // Кнопка инструмента, которая сейчас "активна"
+let mobileGridPlacementProcessed = false; // Флаг для предотвращения двойного размещения при touch+click
 
 // --- Функции управления основным UI и режимами ---
 function toggleGridRotation() {
+    // Закрыть сайдбар на мобильных перед вращением, чтобы избежать визуального беспорядка
+    if (isSidebarOpen) {
+        toggleMobileSidebar();
+    }
+    
     cancelMobileDragMode();
     state.setIsGridRotated(!state.isGridRotated);
     document.querySelector('.grid-container')?.classList.toggle('rotated', state.isGridRotated);
@@ -50,6 +57,7 @@ function toggleDistanceToHGMode() {
     state.setShowDistanceToHG(!state.showDistanceToHG);
     updateDistanceToHGButtonVisualState();
     updateCastleDistanceDisplay();
+    updateAverageDistanceDisplay();
 }
 
 // --- Функции управления мобильным интерфейсом ---
@@ -170,11 +178,14 @@ function cancelMobileDragMode() {
         gridElement.removeEventListener('mousemove', handleMobileGridHover); // Для отладки мышью
         gridElement.removeEventListener('touchend', handleMobileGridPlacement);
         gridElement.removeEventListener('click', handleMobileGridPlacement); // Для отладки мышью
+        gridElement.removeEventListener('touchcancel', handleMobileGridCancel); // Для обработки отмены касания
         gridElement.removeEventListener('touchleave', handleMobileGridLeave); // Для скрытия призрака
         gridElement.removeEventListener('mouseleave', handleMobileGridLeave); // Для скрытия призрака
     }
     // Сбрасываем глобальное состояние draggedType, которое могло использоваться для призрака
     state.setDraggedType(null);
+    // Сбрасываем флаг двойного размещения
+    mobileGridPlacementProcessed = false;
 }
 
 
@@ -216,6 +227,7 @@ function handleMobileBuildingToolSelect(type, clickedItem) {
     gridElement.addEventListener('mousemove', handleMobileGridHover); // Для отладки мышью
     gridElement.addEventListener('touchend', handleMobileGridPlacement);
     gridElement.addEventListener('click', handleMobileGridPlacement);   // Для отладки мышью
+    gridElement.addEventListener('touchcancel', handleMobileGridCancel); // Для обработки отмены касания
     gridElement.addEventListener('touchleave', handleMobileGridLeave);
     gridElement.addEventListener('mouseleave', handleMobileGridLeave);
 }
@@ -246,8 +258,19 @@ function handleMobileGridLeave() {
     }
 }
 
+/** Обрабатывает отмену касания (touchcancel) - например, системный жест iOS. */
+function handleMobileGridCancel() {
+    if (state.isMobileDragging) {
+        removeFullGhostFromGrid();
+        cancelMobileDragMode();
+    }
+}
+
 /** Обрабатывает "тап" (touchend) или клик на сетку для размещения выбранного здания. */
 function handleMobileGridPlacement(event) {
+    // Флаг для предотвращения двойного размещения при touch+click на мобильных
+    if (mobileGridPlacementProcessed) return;
+    
     if (!state.isMobileDragging || !currentMobileToolType) {
         // Если это был клик, а не touchend после выбора инструмента, и режим не активен, ничего не делаем.
         // Если это touchend, но режим уже сброшен (например, из-за touchcancel), тоже ничего.
@@ -258,6 +281,7 @@ function handleMobileGridPlacement(event) {
         return;
     }
 
+    mobileGridPlacementProcessed = true; // Установить флаг перед размещением
 
     const gridElement = document.getElementById('grid');
     const clientX = event.changedTouches ? event.changedTouches[0].clientX : event.clientX;
@@ -328,8 +352,11 @@ function applyGridSizeChange() {
     if (newSize >= 10 && newSize <= 100) {
         state.setGridSize(newSize);
         localStorage.setItem('alliancePlannerGridSize', newSize.toString());
-        document.getElementById('gridSizeInputDesktop').value = newSize; // Синхронизируем оба инпута
-        document.getElementById('gridSizeInputMobile').value = newSize;
+        // Синхронизируем оба инпута, но с проверкой существования
+        const desktopInput = document.getElementById('gridSizeInputDesktop');
+        const mobileInput = document.getElementById('gridSizeInputMobile');
+        if (desktopInput) desktopInput.value = newSize;
+        if (mobileInput) mobileInput.value = newSize;
         setupGrid();
         redrawAllBuildings();
     } else {
@@ -342,6 +369,12 @@ function applyGridSizeChange() {
 document.addEventListener('DOMContentLoaded', () => {
     const savedLang = localStorage.getItem('alliancePlannerLang');
     if (savedLang && translations[savedLang]) state.setCurrentLang(savedLang);
+    
+    // Обновляем активность кнопок языка в соответствии с сохраненным языком
+    document.querySelectorAll('.language-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.lang === state.currentLang);
+    });
+    
     const savedGridSize = localStorage.getItem('alliancePlannerGridSize');
     if (savedGridSize) {
         const parsedGridSize = parseInt(savedGridSize, 10);
@@ -356,7 +389,6 @@ document.addEventListener('DOMContentLoaded', () => {
     checkLocationHash();
 
     document.getElementById('gridSizeInputDesktop').value = state.gridSize;
-    // Кнопки языка на десктопе будут обновлены в languageChangeHandler или synchronizeMobileControls -> updateLanguage
 
     setupGrid();
     initializeMobileInterface();
@@ -381,25 +413,40 @@ function setupGlobalEventListeners() {
 
     const playerNameModal = document.getElementById('playerNameModal');
     const renameModal = document.getElementById('renameModal');
+    const playerNameInput = document.getElementById('playerNameInput');
+    const renameInput = document.getElementById('renameInput');
+    
     document.querySelectorAll('.modal .close').forEach(btn => {
         btn.addEventListener('click', () => {
             cancelMobileDragMode();
             btn.closest('.modal').style.display = 'none';
         });
     });
-    document.getElementById('savePlayerName').addEventListener('click', () => {
+    
+    // Обработчик сохранения имени игрока (создание замка/мертвой зоны)
+    const savePlayerNameHandler = () => {
         cancelMobileDragMode();
         const x = parseInt(playerNameModal.dataset.x, 10);
         const y = parseInt(playerNameModal.dataset.y, 10);
         const buildingType = playerNameModal.dataset.buildingType || 'castle';
-        const playerName = document.getElementById('playerNameInput').value.trim();
+        const playerName = playerNameInput.value.trim();
         createBuildingInManager(buildingType, x, y, playerName);
         playerNameModal.style.display = 'none';
+    };
+    
+    document.getElementById('savePlayerName').addEventListener('click', savePlayerNameHandler);
+    playerNameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            savePlayerNameHandler();
+        }
     });
-    document.getElementById('saveRename').addEventListener('click', () => {
+    
+    // Обработчик переименования здания
+    const saveRenameHandler = () => {
         cancelMobileDragMode();
         const buildingId = renameModal.dataset.buildingId;
-        const newName = document.getElementById('renameInput').value.trim();
+        const newName = renameInput.value.trim();
         const building = state.buildings.find(b => b.id === buildingId);
         if (building) {
             building.playerName = newName;
@@ -408,8 +455,20 @@ function setupGlobalEventListeners() {
             if (state.showDistanceToHG && building.type === 'castle') {
                 updateCastleDistanceDisplay();
             }
+            // Обновить среднее расстояние если переименовали замок или адские врата
+            if (building.type === 'castle' || building.type === 'hellgates') {
+                updateAverageDistanceDisplay();
+            }
         }
         renameModal.style.display = 'none';
+    };
+    
+    document.getElementById('saveRename').addEventListener('click', saveRenameHandler);
+    renameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveRenameHandler();
+        }
     });
 
     const commonViewButtonHandler = (action) => {

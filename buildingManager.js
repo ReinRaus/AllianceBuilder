@@ -9,11 +9,39 @@ import {
     // updateBuildingsList, // Удалено, так как список зданий упразднен
     showRenameModal,
     updateCastleDistanceDisplay,
+    updateAverageDistanceDisplay,
     updateRotateButtonVisualState,
     updateSelectedBuildingToolbar // Для обновления состояния новой панели инструментов
 } from './uiManager.js';
 // Функции из touchControls для добавления сенсорных обработчиков к зданиям
 import { addTouchHandlersToBuilding } from './touchControls.js';
+
+/**
+ * Подстраивает размер шрифта подписи (замка или мертвой зоны) так, чтобы текст
+ * вписывался в рамку здания без скроллбаров.
+ * @param {HTMLElement} nameEl - DOM-элемент подписи.
+ * @param {HTMLElement} buildingEl - DOM-элемент здания.
+ */
+function adjustNameFontSize(nameEl, buildingEl) {
+    if (!nameEl || !buildingEl) return;
+
+    // Начальные параметры
+    const minFontSize = 8;
+    const maxFontSize = 18; // Увеличенный максимум, чтобы подпись могла занять большую часть области
+    let fontSize = maxFontSize;
+
+    // Бинарный поиск оптимального размера шрифта
+    while (fontSize >= minFontSize) {
+        nameEl.style.fontSize = `${fontSize}px`;
+        
+        // Проверяем, вписывается ли содержимое в контейнер без скроллбара
+        if (nameEl.scrollHeight <= nameEl.clientHeight && 
+            nameEl.scrollWidth <= nameEl.clientWidth) {
+            break;
+        }
+        fontSize--;
+    }
+}
 
 // --- Функции для управления отдельными зданиями ---
 
@@ -95,6 +123,11 @@ export function createBuilding(type, x, y, playerName = '') {
     if (state.showDistanceToHG && (type === 'castle' || type === 'hellgates')) {
         updateCastleDistanceDisplay();
     }
+
+    // Обновляем отображение среднего расстояния при добавлении замка или адских врат
+    if (type === 'castle' || type === 'hellgates') {
+        updateAverageDistanceDisplay();
+    }
 }
 
 /**
@@ -138,6 +171,8 @@ export function addBuildingToGrid(building) {
             nameEl.className = 'deadzone-name';
             nameEl.textContent = building.playerName;
             buildingEl.appendChild(nameEl);
+            // Подстраиваем размер шрифта после добавления элемента в DOM
+            requestAnimationFrame(() => adjustNameFontSize(nameEl, buildingEl));
         }
     } else {
         if (building.playerName) {
@@ -145,6 +180,8 @@ export function addBuildingToGrid(building) {
             nameEl.className = 'player-castle-name';
             nameEl.textContent = building.playerName;
             buildingEl.appendChild(nameEl);
+            // Подстраиваем размер шрифта после добавления элемента в DOM
+            requestAnimationFrame(() => adjustNameFontSize(nameEl, buildingEl));
         }
         buildingEl.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
     }
@@ -266,10 +303,17 @@ export function updateBuilding(building) {
             // Здесь мы не дублируем эту логику.
         } else {
             nameEl.textContent = building.playerName || '';
+            // Подстраиваем размер шрифта после изменения текста
+            requestAnimationFrame(() => adjustNameFontSize(nameEl, buildingEl));
         }
         if (building.type === 'deadzone') {
             nameEl.style.display = building.playerName ? 'block' : 'none';
         }
+    }
+
+    // Обновляем отображение среднего расстояния если был перемещен замок или адские врата
+    if (building.type === 'castle' || building.type === 'hellgates') {
+        updateAverageDistanceDisplay();
     }
 }
 
@@ -313,6 +357,11 @@ export function deleteBuilding(id) {
 
     if (state.showDistanceToHG && (buildingToDelete.type === 'castle' || buildingToDelete.type === 'hellgates')) {
         updateCastleDistanceDisplay();
+    }
+
+    // Обновляем отображение среднего расстояния при удалении замка или адских врат
+    if (buildingToDelete.type === 'castle' || buildingToDelete.type === 'hellgates') {
+        updateAverageDistanceDisplay();
     }
 }
 
